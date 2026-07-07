@@ -45,6 +45,16 @@ class EventParserTest {
     }
 
     @Test
+    void tolerantOfUnexpectedFieldTypes() {
+        // turn_index as a string and text as an object must not throw.
+        TelloEvent e = EventParser.parse(obj(
+                "{\"type\":\"user.turn\",\"version\":\"1.0\",\"call_id\":\"c1\",\"turn_index\":\"oops\",\"text\":{\"nested\":1},\"timestamp\":\"t\"}"));
+        TurnEvent t = assertInstanceOf(TurnEvent.class, e);
+        assertEquals(0, t.turnIndex);
+        assertEquals("", t.text);
+    }
+
+    @Test
     void unknownTypeFallsBackToBaseEvent() {
         TelloEvent e = EventParser.parse(obj(
                 "{\"type\":\"future.thing\",\"version\":\"1.0\",\"call_id\":\"c1\",\"timestamp\":\"t\"}"));

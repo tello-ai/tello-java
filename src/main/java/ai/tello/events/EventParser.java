@@ -62,15 +62,22 @@ public final class EventParser {
         return event instanceof StatusChangedEvent sc && "cancelled".equals(sc.status);
     }
 
+    // Tolerant accessors: a field of an unexpected JSON type falls back rather than
+    // throwing, mirroring Python's dict.get(...) forward-compatibility.
+
     private static String str(JsonObject o, String key, String fallback) {
-        return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : fallback;
+        String v = strOrNull(o, key);
+        return v != null ? v : fallback;
     }
 
     private static String strOrNull(JsonObject o, String key) {
-        return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : null;
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsString() : null;
     }
 
     private static int intVal(JsonObject o, String key, int fallback) {
-        return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsInt() : fallback;
+        if (o.has(key) && o.get(key).isJsonPrimitive() && o.getAsJsonPrimitive(key).isNumber()) {
+            return o.get(key).getAsInt();
+        }
+        return fallback;
     }
 }

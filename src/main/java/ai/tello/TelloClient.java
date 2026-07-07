@@ -37,10 +37,16 @@ import java.util.concurrent.CompletionStage;
  * }
  * }</pre>
  *
+ * <p>Thread-safety: inbound events are dispatched sequentially on the WS thread;
+ * command methods may be called from any thread. All call state is guarded by a
+ * single monitor ({@code lock}); {@code waitClosed()} blocks on it. Outbound sends
+ * are serialized on a chain so no two {@code sendText} calls overlap (which
+ * {@code java.net.http.WebSocket} forbids).
+ *
  * <p>Design notes:
  * <ul>
- *   <li>Auth is on the WS upgrade request ({@code Authorization: Bearer <apiKey>}); a bad
- *       key surfaces as {@link AuthenticationException} from {@link #waitClosed()}.</li>
+ *   <li>Auth is on the WS upgrade request; a bad key surfaces as
+ *       {@link AuthenticationException} from {@link #waitClosed()}.</li>
  *   <li>The gateway keeps the socket open on command errors, so {@link #waitClosed()}
  *       resolves on a rejected {@code create_call} too, rather than hanging.</li>
  *   <li>WS-level ping heartbeat is answered with a pong automatically.</li>
@@ -52,18 +58,28 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger("tello");
     private static final int CLOSE_UNAUTHENTICATED = 4401;
     private static final int CLOSE_SESSION_REPLACED = 4429;
+    private static final long CLOSE_WAIT_MILLIS = 5_000L;
     private static final Set<String> NON_ABORTING = Set.of("no_active_call", "call_already_active");
 
     private final ClientConfig config;
     private final HttpClient http = HttpClient.newHttpClient();
-    private final Object lock = new Object();
 
-    private volatile WebSocket ws;
-    private volatile CompletableFuture<Void> done = new CompletableFuture<>();
+    /** Guards all call state below and backs {@link #waitClosed()}'s wait/notify. */
+    private final Object lock = new Object();
+    private boolean active;
+    private int callGen;
+    private boolean callFinished; // current call reached terminal OR connection closed
+    private boolean connectionClosed; // finish() has run
+    private boolean finished; // run-once guard for finish()
+    private TelloException callError; // call-level error to raise once from waitClosed()
+
+    /** Set from either the WS thread or a sender; read from many — kept volatile. */
     private volatile TelloException closeExc;
-    private volatile TelloException callError;
-    private volatile boolean active;
-    private volatile int callGen;
+    private volatile WebSocket ws;
+
+    /** Serializes outbound sends (java.net.http forbids overlapping Text sends). */
+    private final Object sendLock = new Object();
+    private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     public TelloClient() {
         this(null, null);
@@ -99,10 +115,16 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     /** Open the WS connection and start receiving. */
     public CompletableFuture<TelloClient> connect() {
         synchronized (lock) {
-            done = new CompletableFuture<>();
-            closeExc = null;
-            callError = null;
             active = false;
+            callGen = 0;
+            callFinished = false;
+            connectionClosed = false;
+            finished = false;
+            callError = null;
+        }
+        closeExc = null;
+        synchronized (sendLock) {
+            sendChain = CompletableFuture.completedFuture(null);
         }
         return http.newWebSocketBuilder()
                 .header("Authorization", "Bearer " + config.apiKey())
@@ -119,11 +141,31 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         return connect().join();
     }
 
+    /** Close the connection and wait (bounded) for the receive loop to finish. */
     @Override
     public void close() {
         WebSocket webSocket = ws;
         if (webSocket != null) {
-            webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "").join();
+            try {
+                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "").join();
+            } catch (RuntimeException ignored) {
+                // already closing/closed
+            }
+        }
+        synchronized (lock) {
+            long deadline = System.currentTimeMillis() + CLOSE_WAIT_MILLIS;
+            while (!connectionClosed) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    break;
+                }
+                try {
+                    lock.wait(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
     }
 
@@ -134,15 +176,23 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      * disconnect) or a call-start rejection error if one occurred.
      */
     public void waitClosed() {
-        CompletableFuture<Void> current = done;
-        current.join();
-        if (closeExc != null) {
-            throw closeExc;
-        }
-        TelloException error = callError;
-        if (error != null) {
-            callError = null;
-            throw error;
+        synchronized (lock) {
+            while (!callFinished) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            if (closeExc != null) {
+                throw closeExc;
+            }
+            if (callError != null) {
+                TelloException error = callError;
+                callError = null;
+                throw error;
+            }
         }
     }
 
@@ -160,7 +210,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                                               Map<String, ?> metadata, String requestId) {
         synchronized (lock) {
             callGen++;
-            done = new CompletableFuture<>();
+            callFinished = false;
             callError = null;
             active = true;
         }
@@ -184,11 +234,16 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         if (webSocket == null) {
             return failed(connectionError());
         }
-        return webSocket.sendText(frame, true)
-                .thenApply(w -> (Void) null)
-                .exceptionally(ex -> {
-                    throw connectionError();
-                });
+        synchronized (sendLock) {
+            // Chain after any in-flight send so no two Text sends overlap.
+            CompletableFuture<Void> attempt = sendChain
+                    .handle((v, ex) -> (Void) null)
+                    .thenCompose(ignored -> webSocket.sendText(frame, true).thenApply(w -> (Void) null));
+            sendChain = attempt.handle((v, ex) -> (Void) null);
+            return attempt.exceptionally(ex -> {
+                throw connectionError();
+            });
+        }
     }
 
     private static CompletableFuture<Void> failed(Throwable t) {
@@ -216,54 +271,79 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
             LOG.log(System.Logger.Level.WARNING, "tello: dropping non-object frame");
             return;
         }
-        dispatch(EventParser.parse(element.getAsJsonObject()));
+        try {
+            dispatch(EventParser.parse(element.getAsJsonObject()));
+        } catch (RuntimeException e) {
+            // A malformed field must not tear down the connection.
+            LOG.log(System.Logger.Level.WARNING, "tello: dropping unparseable frame", e);
+        }
     }
 
     private void dispatch(TelloEvent event) {
         if (event instanceof ErrorEvent err) {
             TelloException exc = Errors.exceptionFor(err.code, err.message, err.question);
-            if ("unauthenticated".equals(err.code)) {
-                closeExc = exc;
-            } else if (!NON_ABORTING.contains(err.code) && active) {
-                // The gateway sends no terminal frame for a rejected command, so
-                // unblock waitClosed() with the mapped error instead of hanging.
-                synchronized (lock) {
+            synchronized (lock) {
+                if ("unauthenticated".equals(err.code)) {
+                    closeExc = exc;
+                } else if (!NON_ABORTING.contains(err.code) && active) {
+                    // The gateway sends no terminal frame for a rejected command, so
+                    // unblock waitClosed() with the mapped error instead of hanging.
                     callError = exc;
                     active = false;
+                    callFinished = true;
+                    lock.notifyAll();
                 }
-                done.complete(null);
             }
             emit(EventType.ERROR, err);
             return;
         }
 
         // Snapshot the call generation: if a terminal handler starts a follow-up
-        // call, callGen advances and we must not complete the new call's future.
-        int gen = callGen;
+        // call, callGen advances and we must not finish the wrong call.
+        int gen;
+        synchronized (lock) {
+            gen = callGen;
+        }
         emit(event.type(), event);
-        if (EventParser.isTerminal(event) && callGen == gen) {
-            active = false;
-            done.complete(null);
+        if (EventParser.isTerminal(event)) {
+            synchronized (lock) {
+                if (callGen == gen) {
+                    active = false;
+                    callFinished = true;
+                    lock.notifyAll();
+                }
+            }
         }
     }
 
     private void noteClose(int code, String reason) {
-        if (closeExc != null) {
-            return;
-        }
         if (code == CLOSE_UNAUTHENTICATED) {
-            closeExc = new AuthenticationException(isBlank(reason) ? "unauthenticated" : reason);
+            if (closeExc == null) {
+                closeExc = new AuthenticationException(isBlank(reason) ? "unauthenticated" : reason);
+            }
         } else if (code == CLOSE_SESSION_REPLACED) {
-            closeExc = new SessionReplacedException(isBlank(reason) ? "session replaced" : reason);
+            if (closeExc == null) {
+                closeExc = new SessionReplacedException(isBlank(reason) ? "session replaced" : reason);
+            }
         }
     }
 
     private void finish() {
-        if (active && closeExc == null && callError == null) {
-            closeExc = new ConnectionClosedException("connection closed before call terminated");
+        synchronized (lock) {
+            if (finished) {
+                return;
+            }
+            finished = true;
+            if (active && closeExc == null && callError == null) {
+                closeExc = new ConnectionClosedException("connection closed before call terminated");
+            }
         }
         emit(EventType.DISCONNECTED, new Event(EventType.DISCONNECTED, "", "", "", new JsonObject()));
-        done.complete(null);
+        synchronized (lock) {
+            callFinished = true;
+            connectionClosed = true;
+            lock.notifyAll();
+        }
     }
 
     private static boolean isBlank(String s) {
@@ -320,7 +400,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             if (closeExc == null && active) {
-                closeExc = new ConnectionClosedException("connection error: " + error.getMessage());
+                closeExc = new ConnectionClosedException("connection error: " + error);
             }
             finish();
         }
