@@ -1,0 +1,17 @@
+package ai.tello.events;
+
+import com.google.gson.JsonObject;
+
+/** {@code user.turn} / {@code agent.turn}. */
+public class TurnEvent extends Event {
+
+    public final int turnIndex;
+    public final String text;
+
+    public TurnEvent(String type, String version, String callId, String timestamp, JsonObject raw,
+                     int turnIndex, String text) {
+        super(type, version, callId, timestamp, raw);
+        this.turnIndex = turnIndex;
+        this.text = text;
+    }
+}
