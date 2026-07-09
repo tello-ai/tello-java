@@ -36,7 +36,7 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
         TurnEvent turn = (TurnEvent) e;
         client.answer("확인했습니다. 계속 말씀해주세요.");
     });
-    client.createCall("agent-1", "예약 확인").join();
+    client.createCall("+821012345678", "agent-1", "예약 확인").join();
     client.waitClosed();
 }
 ```
@@ -71,6 +71,7 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | gateway `code` | exception |
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (also close code 4401) |
+| `to_required` | `ValidationException` |
 | `agent_id_required` | `ValidationException` |
 | `call_already_active` | `CallAlreadyActiveException` |
 | `no_active_call` | `NoActiveCallException` |

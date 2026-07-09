@@ -16,9 +16,10 @@ class CommandsTest {
 
     @Test
     void createCallUsesEnvelopeAndCamelCase() {
-        JsonObject frame = parse(Commands.createCall("agent-1", "hi", Map.of("src", "test"), "r1"));
+        JsonObject frame = parse(Commands.createCall("+821012345678", "agent-1", "hi", Map.of("src", "test"), "r1"));
         assertEquals("create_call", frame.get("event").getAsString());
         JsonObject data = frame.getAsJsonObject("data");
+        assertEquals("+821012345678", data.get("to").getAsString());
         assertEquals("agent-1", data.get("agentId").getAsString());
         assertEquals("hi", data.get("prompt").getAsString());
         assertEquals("test", data.getAsJsonObject("metadata").get("src").getAsString());
@@ -27,7 +28,8 @@ class CommandsTest {
 
     @Test
     void createCallOmitsOptionalFields() {
-        JsonObject data = parse(Commands.createCall("agent-1", "", null, null)).getAsJsonObject("data");
+        JsonObject data = parse(Commands.createCall("+821012345678", "agent-1", "", null, null)).getAsJsonObject("data");
+        assertEquals("+821012345678", data.get("to").getAsString());
         assertFalse(data.has("metadata"));
         assertFalse(data.has("requestId"));
     }

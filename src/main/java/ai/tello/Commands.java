@@ -18,8 +18,9 @@ public final class Commands {
 
     private Commands() {}
 
-    public static String createCall(String agentId, String prompt, Map<String, ?> metadata, String requestId) {
+    public static String createCall(String to, String agentId, String prompt, Map<String, ?> metadata, String requestId) {
         JsonObject data = new JsonObject();
+        data.addProperty("to", to);
         data.addProperty("agentId", agentId);
         data.addProperty("prompt", prompt == null ? "" : prompt);
         if (metadata != null) {

@@ -12,6 +12,7 @@ public final class Errors {
         switch (code) {
             case "unauthenticated":
                 return new AuthenticationException(message);
+            case "to_required":
             case "agent_id_required":
                 return new ValidationException(message);
             case "call_already_active":
