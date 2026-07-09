@@ -54,4 +54,20 @@ class CommandsTest {
         JsonObject data = parse(Commands.listAgents(null)).getAsJsonObject("data");
         assertFalse(data.has("requestId"));
     }
+
+    @Test
+    void summaryAndSmsFrames() {
+        JsonObject summary = parse(Commands.getSummary("call-1", "summary-1"));
+        assertEquals("getSummary", summary.get("event").getAsString());
+        assertEquals("call-1", summary.getAsJsonObject("data").get("callId").getAsString());
+        assertEquals("summary-1", summary.getAsJsonObject("data").get("requestId").getAsString());
+
+        JsonObject sms = parse(Commands.sendSms("01012345678", "예약 확인", "call-1", "sms-1"));
+        JsonObject data = sms.getAsJsonObject("data");
+        assertEquals("sendSms", sms.get("event").getAsString());
+        assertEquals("01012345678", data.get("to").getAsString());
+        assertEquals("예약 확인", data.get("message").getAsString());
+        assertEquals("call-1", data.get("callId").getAsString());
+        assertEquals("sms-1", data.get("requestId").getAsString());
+    }
 }

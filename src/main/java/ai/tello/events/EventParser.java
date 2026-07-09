@@ -42,6 +42,33 @@ public final class EventParser {
                     frame);
         }
 
+        if (EventType.CALL_SUMMARY.equals(type)) {
+            return new CallSummaryEvent(
+                    type,
+                    str(frame, "version", ""),
+                    strOrNull(frame, "requestId"),
+                    str(frame, "callId", ""),
+                    str(frame, "status", ""),
+                    intOrNull(frame, "durationSeconds"),
+                    strOrNull(frame, "transcript"),
+                    strOrNull(frame, "summary"),
+                    intOrNull(frame, "creditCharged"),
+                    frame);
+        }
+
+        if (EventType.SMS_SENT.equals(type)) {
+            return new SmsSentEvent(
+                    type,
+                    str(frame, "version", ""),
+                    strOrNull(frame, "requestId"),
+                    str(frame, "smsId", ""),
+                    str(frame, "status", ""),
+                    str(frame, "to", ""),
+                    str(frame, "messagePreview", ""),
+                    strOrNull(frame, "callId"),
+                    frame);
+        }
+
         String version = str(frame, "version", "");
         String sessionId = str(frame, "sessionId", "");
         String callId = str(frame, "callId", "");
@@ -93,6 +120,13 @@ public final class EventParser {
             return o.get(key).getAsInt();
         }
         return fallback;
+    }
+
+    private static Integer intOrNull(JsonObject o, String key) {
+        if (o.has(key) && o.get(key).isJsonPrimitive() && o.getAsJsonPrimitive(key).isNumber()) {
+            return o.get(key).getAsInt();
+        }
+        return null;
     }
 
     private static boolean boolVal(JsonObject o, String key) {

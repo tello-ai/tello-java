@@ -70,6 +70,25 @@ class EventParserTest {
     }
 
     @Test
+    void parsesCallSummaryAndSmsSent() {
+        TelloEvent summaryEvent = EventParser.parse(obj(
+                "{\"type\":\"call.summary\",\"version\":\"1.0\",\"requestId\":\"summary-1\",\"callId\":\"call-1\",\"status\":\"completed\",\"durationSeconds\":42,\"transcript\":\"고객: 예약 확인\",\"summary\":\"예약 확인 완료\",\"creditCharged\":15}"));
+        CallSummaryEvent summary = assertInstanceOf(CallSummaryEvent.class, summaryEvent);
+        assertEquals("summary-1", summary.requestId);
+        assertEquals("call-1", summary.callId);
+        assertEquals(42, summary.durationSeconds);
+        assertEquals(15, summary.creditCharged);
+
+        TelloEvent smsEvent = EventParser.parse(obj(
+                "{\"type\":\"sms.sent\",\"version\":\"1.0\",\"requestId\":\"sms-1\",\"smsId\":\"77\",\"status\":\"queued\",\"to\":\"01012345678\",\"messagePreview\":\"예약 확인\",\"callId\":\"call-1\"}"));
+        SmsSentEvent sms = assertInstanceOf(SmsSentEvent.class, smsEvent);
+        assertEquals("sms-1", sms.requestId);
+        assertEquals("77", sms.smsId);
+        assertEquals("queued", sms.status);
+        assertEquals("call-1", sms.callId);
+    }
+
+    @Test
     void detectsTerminalEvents() {
         assertTrue(EventParser.isTerminal(EventParser.parse(obj(
                 "{\"type\":\"call.completed\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"completed\",\"timestamp\":\"t\"}"))));
