@@ -229,6 +229,14 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         return send(Commands.cancel());
     }
 
+    public CompletableFuture<Void> listAgents() {
+        return listAgents(null);
+    }
+
+    public CompletableFuture<Void> listAgents(String requestId) {
+        return send(Commands.listAgents(requestId));
+    }
+
     private CompletableFuture<Void> send(String frame) {
         WebSocket webSocket = ws;
         if (webSocket == null) {

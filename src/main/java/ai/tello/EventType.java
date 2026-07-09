@@ -11,6 +11,7 @@ public final class EventType {
 
     public static final String USER_TURN = "user.turn";
     public static final String AGENT_TURN = "agent.turn";
+    public static final String AGENTS_LISTED = "agents.listed";
     public static final String CALL_STATUS_CHANGED = "call.statusChanged";
     public static final String CALL_COMPLETED = "call.completed";
     public static final String CALL_NO_ANSWER = "call.noAnswer";

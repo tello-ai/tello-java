@@ -48,6 +48,14 @@ public final class Commands {
         return envelope("cancel", new JsonObject());
     }
 
+    public static String listAgents(String requestId) {
+        JsonObject data = new JsonObject();
+        if (requestId != null) {
+            data.addProperty("requestId", requestId);
+        }
+        return envelope("listAgents", data);
+    }
+
     private static String envelope(String event, JsonElement data) {
         JsonObject frame = new JsonObject();
         frame.addProperty("event", event);

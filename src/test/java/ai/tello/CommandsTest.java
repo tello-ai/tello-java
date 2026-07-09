@@ -41,4 +41,17 @@ class CommandsTest {
         assertEquals("m1", answer.getAsJsonObject("data").get("messageId").getAsString());
         assertEquals("cancel", parse(Commands.cancel()).get("event").getAsString());
     }
+
+    @Test
+    void listAgentsFrameUsesRequestIdWhenProvided() {
+        JsonObject frame = parse(Commands.listAgents("agents-1"));
+        assertEquals("listAgents", frame.get("event").getAsString());
+        assertEquals("agents-1", frame.getAsJsonObject("data").get("requestId").getAsString());
+    }
+
+    @Test
+    void listAgentsFrameOmitsEmptyRequestId() {
+        JsonObject data = parse(Commands.listAgents(null)).getAsJsonObject("data");
+        assertFalse(data.has("requestId"));
+    }
 }
