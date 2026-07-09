@@ -10,13 +10,16 @@ public class Event implements TelloEvent {
 
     public final String type;
     public final String version;
+    public final String sessionId;
     public final String callId;
     public final String timestamp;
     public final JsonObject raw;
 
-    public Event(String type, String version, String callId, String timestamp, JsonObject raw) {
+    public Event(String type, String version, String sessionId, String callId, String timestamp,
+                 JsonObject raw) {
         this.type = type;
         this.version = version;
+        this.sessionId = sessionId;
         this.callId = callId;
         this.timestamp = timestamp;
         this.raw = raw;

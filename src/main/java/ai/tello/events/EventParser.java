@@ -24,36 +24,37 @@ public final class EventParser {
                     str(frame, "version", ""),
                     str(frame, "code", ""),
                     str(frame, "message", ""),
-                    strOrNull(frame, "request_id"),
+                    strOrNull(frame, "requestId"),
                     strOrNull(frame, "question"),
                     frame);
         }
 
         String version = str(frame, "version", "");
-        String callId = str(frame, "call_id", "");
+        String sessionId = str(frame, "sessionId", "");
+        String callId = str(frame, "callId", "");
         String timestamp = str(frame, "timestamp", "");
 
         if (EventType.USER_TURN.equals(type) || EventType.AGENT_TURN.equals(type)) {
-            return new TurnEvent(type, version, callId, timestamp, frame,
-                    intVal(frame, "turn_index", 0), str(frame, "text", ""));
+            return new TurnEvent(type, version, sessionId, callId, timestamp, frame,
+                    intVal(frame, "turnIndex", 0), str(frame, "text", ""));
         }
 
         if (EventType.CALL_STATUS_CHANGED.equals(type)) {
-            return new StatusChangedEvent(type, version, callId, timestamp, frame,
-                    str(frame, "status", ""), str(frame, "previous_status", ""));
+            return new StatusChangedEvent(type, version, sessionId, callId, timestamp, frame,
+                    str(frame, "status", ""), str(frame, "previousStatus", ""));
         }
 
         if (TERMINAL_TYPES.contains(type)) {
-            return new TerminalEvent(type, version, callId, timestamp, frame,
-                    str(frame, "status", ""), strOrNull(frame, "failure_reason"));
+            return new TerminalEvent(type, version, sessionId, callId, timestamp, frame,
+                    str(frame, "status", ""), strOrNull(frame, "failureReason"));
         }
 
-        return new Event(type, version, callId, timestamp, frame);
+        return new Event(type, version, sessionId, callId, timestamp, frame);
     }
 
     /**
      * True if {@code event} ends the current call: the three {@code call.*} terminals
-     * plus a {@code call.status_changed} with status {@code cancelled}.
+     * plus a {@code call.statusChanged} with status {@code cancelled}.
      */
     public static boolean isTerminal(TelloEvent event) {
         if (TERMINAL_TYPES.contains(event.type())) {

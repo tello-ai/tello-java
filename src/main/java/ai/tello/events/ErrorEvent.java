@@ -11,7 +11,7 @@ public class ErrorEvent implements TelloEvent {
     public final String message;
     /** Nullable; echoes the client's {@code requestId} on the failed command. */
     public final String requestId;
-    /** Nullable; present for {@code call_rejected}. */
+    /** Nullable; present for {@code callRejected}. */
     public final String question;
     public final JsonObject raw;
 

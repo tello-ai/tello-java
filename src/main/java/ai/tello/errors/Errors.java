@@ -12,16 +12,16 @@ public final class Errors {
         switch (code) {
             case "unauthenticated":
                 return new AuthenticationException(message);
-            case "to_required":
-            case "agent_id_required":
+            case "toRequired":
+            case "agentIdRequired":
                 return new ValidationException(message);
-            case "call_already_active":
+            case "callAlreadyActive":
                 return new CallAlreadyActiveException(message);
-            case "no_active_call":
+            case "noActiveCall":
                 return new NoActiveCallException(message);
-            case "call_rejected":
+            case "callRejected":
                 return new CallRejectedException(message, question);
-            case "internal_error":
+            case "internalError":
             default:
                 return new TelloServerException(message);
         }

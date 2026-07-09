@@ -59,7 +59,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private static final int CLOSE_UNAUTHENTICATED = 4401;
     private static final int CLOSE_SESSION_REPLACED = 4429;
     private static final long CLOSE_WAIT_MILLIS = 5_000L;
-    private static final Set<String> NON_ABORTING = Set.of("no_active_call", "call_already_active");
+    private static final Set<String> NON_ABORTING = Set.of("noActiveCall", "callAlreadyActive");
 
     private final ClientConfig config;
     private final HttpClient http = HttpClient.newHttpClient();
@@ -338,7 +338,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                 closeExc = new ConnectionClosedException("connection closed before call terminated");
             }
         }
-        emit(EventType.DISCONNECTED, new Event(EventType.DISCONNECTED, "", "", "", new JsonObject()));
+        emit(EventType.DISCONNECTED, new Event(EventType.DISCONNECTED, "", "", "", "", new JsonObject()));
         synchronized (lock) {
             callFinished = true;
             connectionClosed = true;

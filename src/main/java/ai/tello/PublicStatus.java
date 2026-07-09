@@ -5,10 +5,10 @@ public enum PublicStatus {
     QUEUED("queued"),
     DIALING("dialing"),
     RINGING("ringing"),
-    IN_PROGRESS("in_progress"),
+    IN_PROGRESS("inProgress"),
     TRANSFERRING("transferring"),
     COMPLETED("completed"),
-    NO_ANSWER("no_answer"),
+    NO_ANSWER("noAnswer"),
     FAILED("failed"),
     CANCELLED("cancelled");
 

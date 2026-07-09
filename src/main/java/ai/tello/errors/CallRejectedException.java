@@ -1,6 +1,6 @@
 package ai.tello.errors;
 
-/** The call was rejected by intent validation ({@code call_rejected}). */
+/** The call was rejected by intent validation ({@code callRejected}). */
 public class CallRejectedException extends TelloException {
 
     /** Nullable clarifying question returned by the gateway. */

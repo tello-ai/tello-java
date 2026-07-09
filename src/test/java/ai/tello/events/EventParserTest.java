@@ -18,37 +18,57 @@ class EventParserTest {
     @Test
     void parsesUserTurn() {
         TelloEvent e = EventParser.parse(obj(
-                "{\"type\":\"user.turn\",\"version\":\"1.0\",\"call_id\":\"c1\",\"turn_index\":2,\"text\":\"hey\",\"timestamp\":\"t\"}"));
+                "{\"type\":\"user.turn\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"turnIndex\":2,\"text\":\"hey\",\"timestamp\":\"t\"}"));
         TurnEvent t = assertInstanceOf(TurnEvent.class, e);
         assertEquals(2, t.turnIndex);
         assertEquals("hey", t.text);
         assertEquals("c1", t.callId);
+        assertEquals("s1", t.sessionId);
     }
 
     @Test
     void parsesFlatErrorWithRequestId() {
         TelloEvent e = EventParser.parse(obj(
-                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"no_active_call\",\"message\":\"No active call\",\"request_id\":\"r1\"}"));
+                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"noActiveCall\",\"message\":\"No active call\",\"requestId\":\"r1\"}"));
         ErrorEvent err = assertInstanceOf(ErrorEvent.class, e);
-        assertEquals("no_active_call", err.code);
+        assertEquals("noActiveCall", err.code);
         assertEquals("r1", err.requestId);
+    }
+
+    @Test
+    void parsesStatusChangedWithPreviousStatus() {
+        TelloEvent e = EventParser.parse(obj(
+                "{\"type\":\"call.statusChanged\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"inProgress\",\"previousStatus\":\"ringing\",\"timestamp\":\"t\"}"));
+        StatusChangedEvent sc = assertInstanceOf(StatusChangedEvent.class, e);
+        assertEquals("inProgress", sc.status);
+        assertEquals("ringing", sc.previousStatus);
+    }
+
+    @Test
+    void parsesNoAnswerTerminalWithFailureReason() {
+        TelloEvent e = EventParser.parse(obj(
+                "{\"type\":\"call.noAnswer\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"noAnswer\",\"failureReason\":\"timeout\",\"timestamp\":\"t\"}"));
+        TerminalEvent term = assertInstanceOf(TerminalEvent.class, e);
+        assertEquals("noAnswer", term.status);
+        assertEquals("timeout", term.failureReason);
+        assertTrue(EventParser.isTerminal(term));
     }
 
     @Test
     void detectsTerminalEvents() {
         assertTrue(EventParser.isTerminal(EventParser.parse(obj(
-                "{\"type\":\"call.completed\",\"version\":\"1.0\",\"call_id\":\"c1\",\"status\":\"completed\",\"timestamp\":\"t\"}"))));
+                "{\"type\":\"call.completed\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"completed\",\"timestamp\":\"t\"}"))));
         assertTrue(EventParser.isTerminal(EventParser.parse(obj(
-                "{\"type\":\"call.status_changed\",\"version\":\"1.0\",\"call_id\":\"c1\",\"status\":\"cancelled\",\"previous_status\":\"in_progress\",\"timestamp\":\"t\"}"))));
+                "{\"type\":\"call.statusChanged\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"cancelled\",\"previousStatus\":\"inProgress\",\"timestamp\":\"t\"}"))));
         assertFalse(EventParser.isTerminal(EventParser.parse(obj(
-                "{\"type\":\"call.status_changed\",\"version\":\"1.0\",\"call_id\":\"c1\",\"status\":\"in_progress\",\"previous_status\":\"queued\",\"timestamp\":\"t\"}"))));
+                "{\"type\":\"call.statusChanged\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"inProgress\",\"previousStatus\":\"queued\",\"timestamp\":\"t\"}"))));
     }
 
     @Test
     void tolerantOfUnexpectedFieldTypes() {
-        // turn_index as a string and text as an object must not throw.
+        // turnIndex as a string and text as an object must not throw.
         TelloEvent e = EventParser.parse(obj(
-                "{\"type\":\"user.turn\",\"version\":\"1.0\",\"call_id\":\"c1\",\"turn_index\":\"oops\",\"text\":{\"nested\":1},\"timestamp\":\"t\"}"));
+                "{\"type\":\"user.turn\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"turnIndex\":\"oops\",\"text\":{\"nested\":1},\"timestamp\":\"t\"}"));
         TurnEvent t = assertInstanceOf(TurnEvent.class, e);
         assertEquals(0, t.turnIndex);
         assertEquals("", t.text);
@@ -57,7 +77,7 @@ class EventParserTest {
     @Test
     void unknownTypeFallsBackToBaseEvent() {
         TelloEvent e = EventParser.parse(obj(
-                "{\"type\":\"future.thing\",\"version\":\"1.0\",\"call_id\":\"c1\",\"timestamp\":\"t\"}"));
+                "{\"type\":\"future.thing\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"timestamp\":\"t\"}"));
         assertEquals("future.thing", e.type());
         assertInstanceOf(Event.class, e);
     }

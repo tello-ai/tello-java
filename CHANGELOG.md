@@ -1,13 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Changed (camelCase wire contract)
+
+- Inbound frames now use camelCase wire keys (`sessionId`, `callId`, `turnIndex`,
+  `previousStatus`, `failureReason`, `requestId`); event types renamed:
+  `call.status_changed` → `call.statusChanged`, `call.no_answer` → `call.noAnswer`.
+- Status vocabulary now camelCase: `in_progress` → `inProgress`,
+  `no_answer` → `noAnswer`.
+- Error codes now camelCase: `toRequired`, `agentIdRequired`, `callAlreadyActive`,
+  `noActiveCall`, `callRejected`, `internalError` (exception class names unchanged).
+- Events now carry `sessionId` (exposed on `Event.sessionId`).
+- Outbound commands unchanged (already camelCase).
+
 ## 0.1.0 (unreleased)
 
 - Initial WS realtime client for turn-provider-gateway `/sdk`, ported from
   `tello-python` (behaviour 1:1 with the gateway).
 - `TelloClient`: connect (Bearer auth), `createCall` / `answer` / `cancel`,
   pub/sub event handlers (`on`), `waitClosed`.
-- Event parsing for `user.turn` / `agent.turn` / `call.status_changed` /
-  `call.completed` / `call.no_answer` / `call.failed` / `error`.
+- Event parsing for `user.turn` / `agent.turn` / `call.status_changed` (now
+  `call.statusChanged`) / `call.completed` / `call.no_answer` (now
+  `call.noAnswer`) / `call.failed` / `error`.
 - Outbound `{event,data}` envelope vs inbound flat `{type,...}` isolated at the
   module boundary (`Commands` / `EventParser`).
 - Error-code → exception mapping; close 4401 → `AuthenticationException`,

@@ -54,9 +54,9 @@ cast to the concrete type:
 | --- | --- | --- |
 | `USER_TURN` | `user.turn` | `TurnEvent` (`turnIndex`, `text`) |
 | `AGENT_TURN` | `agent.turn` | `TurnEvent` (`turnIndex`, `text`) |
-| `CALL_STATUS_CHANGED` | `call.status_changed` | `StatusChangedEvent` (`status`, `previousStatus`) |
+| `CALL_STATUS_CHANGED` | `call.statusChanged` | `StatusChangedEvent` (`status`, `previousStatus`) |
 | `CALL_COMPLETED` | `call.completed` | `TerminalEvent` (`status`) |
-| `CALL_NO_ANSWER` | `call.no_answer` | `TerminalEvent` (`status`, `failureReason`) |
+| `CALL_NO_ANSWER` | `call.noAnswer` | `TerminalEvent` (`status`, `failureReason`) |
 | `CALL_FAILED` | `call.failed` | `TerminalEvent` (`status`, `failureReason`) |
 | `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`) |
 | `DISCONNECTED` | `disconnected` | `Event` (SDK-local; emitted when the WS closes) |
@@ -71,12 +71,12 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | gateway `code` | exception |
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (also close code 4401) |
-| `to_required` | `ValidationException` |
-| `agent_id_required` | `ValidationException` |
-| `call_already_active` | `CallAlreadyActiveException` |
-| `no_active_call` | `NoActiveCallException` |
-| `call_rejected` | `CallRejectedException` (with `.question`) |
-| `internal_error` | `TelloServerException` |
+| `toRequired` | `ValidationException` |
+| `agentIdRequired` | `ValidationException` |
+| `callAlreadyActive` | `CallAlreadyActiveException` |
+| `noActiveCall` | `NoActiveCallException` |
+| `callRejected` | `CallRejectedException` (with `.question`) |
+| `internalError` | `TelloServerException` |
 
 Command errors are also delivered to `EventType.ERROR` subscribers without closing
 the socket. `waitClosed()` re-raises the relevant error so a failed `createCall`
