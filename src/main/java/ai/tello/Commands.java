@@ -29,7 +29,7 @@ public final class Commands {
         if (requestId != null) {
             data.addProperty("requestId", requestId);
         }
-        return envelope("create_call", data);
+        return envelope("createCall", data);
     }
 
     public static String answer(String text, String messageId, String requestId) {
@@ -42,6 +42,18 @@ public final class Commands {
             data.addProperty("requestId", requestId);
         }
         return envelope("answer", data);
+    }
+
+    public static String sendDtmf(String digits, String messageId, String requestId) {
+        JsonObject data = new JsonObject();
+        data.addProperty("digits", digits == null ? "" : digits);
+        if (messageId != null) {
+            data.addProperty("messageId", messageId);
+        }
+        if (requestId != null) {
+            data.addProperty("requestId", requestId);
+        }
+        return envelope("sendDtmf", data);
     }
 
     public static String cancel() {

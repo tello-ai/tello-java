@@ -26,7 +26,7 @@ import java.util.concurrent.CompletionStage;
  * Tello WebSocket realtime client.
  *
  * <p>Opens a single WS connection to the turn-provider-gateway {@code /sdk} endpoint,
- * sends command frames ({@code create_call} / {@code answer} / {@code cancel}) and
+ * sends command frames ({@code createCall} / {@code answer} / {@code cancel}) and
  * dispatches inbound turn/status/terminal/error events to pub/sub handlers.
  *
  * <pre>{@code
@@ -48,7 +48,7 @@ import java.util.concurrent.CompletionStage;
  *   <li>Auth is on the WS upgrade request; a bad key surfaces as
  *       {@link AuthenticationException} from {@link #waitClosed()}.</li>
  *   <li>The gateway keeps the socket open on command errors, so {@link #waitClosed()}
- *       resolves on a rejected {@code create_call} too, rather than hanging.</li>
+ *       resolves on a rejected {@code createCall} too, rather than hanging.</li>
  *   <li>WS-level ping heartbeat is answered with a pong automatically.</li>
  *   <li>There is no reconnect/resume protocol.</li>
  * </ul>
@@ -223,6 +223,14 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     public CompletableFuture<Void> answer(String text, String messageId, String requestId) {
         return send(Commands.answer(text, messageId, requestId));
+    }
+
+    public CompletableFuture<Void> sendDtmf(String digits) {
+        return sendDtmf(digits, null, null);
+    }
+
+    public CompletableFuture<Void> sendDtmf(String digits, String messageId, String requestId) {
+        return send(Commands.sendDtmf(digits, messageId, requestId));
     }
 
     public CompletableFuture<Void> cancel() {
