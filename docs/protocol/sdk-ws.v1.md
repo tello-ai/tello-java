@@ -86,7 +86,9 @@ HTTP upgrade 요청에서 API key를 다음 순서로 읽는다.
 }}
 ```
 
-활성 통화가 없으면 error `noActiveCall`.
+`digits`는 키패드 문자 `0-9`, `*`, `#`만 허용한다. 활성 통화가 없으면 error
+`noActiveCall`, `digits`가 비면 `dtmfDigitsRequired`, 허용 문자 외가 섞이면
+`dtmfDigitsInvalid`.
 
 ## 5. 이벤트 (server → client)
 
@@ -120,6 +122,8 @@ status 어휘: `queued`, `dialing`, `ringing`, `inProgress`, `transferring`, `co
 | `toRequired` | to is required | |
 | `agentIdRequired` | agentId is required | |
 | `noActiveCall` | No active call | |
+| `dtmfDigitsRequired` | digits is required | `sendDtmf`에 `digits` 누락 |
+| `dtmfDigitsInvalid` | digits must contain only 0-9, *, # | `sendDtmf` `digits`에 허용 외 문자 |
 | `callRejected` | Call rejected | `question` 필드 동반 가능 |
 | `internalError` | Internal error | `message`에 상세 사유 |
 
