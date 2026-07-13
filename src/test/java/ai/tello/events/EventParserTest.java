@@ -36,6 +36,16 @@ class EventParserTest {
     }
 
     @Test
+    void parsesAnswerAcceptedWithRequestCorrelation() {
+        TelloEvent e = EventParser.parse(obj(
+                "{\"type\":\"answer.accepted\",\"version\":\"1.0\",\"requestId\":\"answer-1\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"messageId\":\"message-1\",\"timestamp\":\"t\"}"));
+        AnswerAcceptedEvent accepted = assertInstanceOf(AnswerAcceptedEvent.class, e);
+        assertEquals("answer-1", accepted.requestId);
+        assertEquals("message-1", accepted.messageId);
+        assertEquals("c1", accepted.callId);
+    }
+
+    @Test
     void parsesStatusChangedWithPreviousStatus() {
         TelloEvent e = EventParser.parse(obj(
                 "{\"type\":\"call.statusChanged\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"inProgress\",\"previousStatus\":\"ringing\",\"timestamp\":\"t\"}"));

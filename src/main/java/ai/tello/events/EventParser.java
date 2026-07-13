@@ -33,6 +33,18 @@ public final class EventParser {
                     frame);
         }
 
+        if (EventType.ANSWER_ACCEPTED.equals(type)) {
+            return new AnswerAcceptedEvent(
+                    type,
+                    str(frame, "version", ""),
+                    strOrNull(frame, "requestId"),
+                    str(frame, "sessionId", ""),
+                    str(frame, "callId", ""),
+                    str(frame, "messageId", ""),
+                    str(frame, "timestamp", ""),
+                    frame);
+        }
+
         if (EventType.AGENTS_LISTED.equals(type)) {
             return new AgentsListedEvent(
                     type,
