@@ -5,10 +5,13 @@ package ai.tello;
  *
  * <p>The first group matches the gateway 1:1. {@link #DISCONNECTED} is an
  * SDK-local pseudo-event emitted when the WS connection ends (never sent by the
- * gateway).
+ * gateway). {@link #AUTH_OK} is consumed internally by the connect handshake and
+ * is not re-emitted to subscribers.
  */
 public final class EventType {
 
+    /** Server acknowledgement of the {@code authenticate} handshake. Handled internally. */
+    public static final String AUTH_OK = "auth.ok";
     public static final String USER_TURN = "user.turn";
     public static final String AGENT_TURN = "agent.turn";
     public static final String AGENTS_LISTED = "agents.listed";

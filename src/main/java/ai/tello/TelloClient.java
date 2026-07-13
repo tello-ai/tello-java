@@ -20,7 +20,10 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Tello WebSocket realtime client.
@@ -45,8 +48,12 @@ import java.util.concurrent.CompletionStage;
  *
  * <p>Design notes:
  * <ul>
- *   <li>Auth is on the WS upgrade request; a bad key surfaces as
- *       {@link AuthenticationException} from {@link #waitClosed()}.</li>
+ *   <li>Authentication is internal to {@link #connect()}: once the socket opens the
+ *       client sends an {@code authenticate} frame as its first application frame and
+ *       withholds every other command until the server returns {@code auth.ok}. A
+ *       rejected key ({@code unauthenticated} error frame or close 4401) or an
+ *       {@code auth.ok} wait timeout makes {@code connect()} fail; the API key is
+ *       never placed in the URL, a header, a log line, or an exception message.</li>
  *   <li>The gateway keeps the socket open on command errors, so {@link #waitClosed()}
  *       resolves on a rejected {@code createCall} too, rather than hanging.</li>
  *   <li>WS-level ping heartbeat is answered with a pong automatically.</li>
@@ -76,6 +83,13 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     /** Set from either the WS thread or a sender; read from many — kept volatile. */
     private volatile TelloException closeExc;
     private volatile WebSocket ws;
+
+    /**
+     * Completes when the server acknowledges the {@code authenticate} handshake with
+     * {@code auth.ok}, or completes exceptionally on an auth failure / timeout. Every
+     * outbound business command waits on it, so nothing is sent before {@code auth.ok}.
+     */
+    private volatile CompletableFuture<Void> authFuture = new CompletableFuture<>();
 
     /** Serializes outbound sends (java.net.http forbids overlapping Text sends). */
     private final Object sendLock = new Object();
@@ -112,7 +126,15 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     // -- lifecycle ---------------------------------------------------------
 
-    /** Open the WS connection and start receiving. */
+    /**
+     * Open the WS connection, authenticate, and start receiving.
+     *
+     * <p>The returned future completes only after the server has acknowledged the
+     * internal {@code authenticate} handshake with {@code auth.ok}. It completes
+     * exceptionally — with a {@link ai.tello.errors.TelloException} — if the key is
+     * rejected ({@code unauthenticated} error frame or close 4401) or {@code auth.ok}
+     * does not arrive within the configured connect timeout.
+     */
     public CompletableFuture<TelloClient> connect() {
         synchronized (lock) {
             active = false;
@@ -123,22 +145,69 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
             callError = null;
         }
         closeExc = null;
+        authFuture = new CompletableFuture<>();
         synchronized (sendLock) {
             sendChain = CompletableFuture.completedFuture(null);
         }
         return http.newWebSocketBuilder()
-                .header("Authorization", "Bearer " + config.apiKey())
                 .connectTimeout(Duration.ofMillis(config.connectTimeoutMillis()))
                 .buildAsync(URI.create(config.url()), new Listener())
-                .thenApply(webSocket -> {
+                .thenCompose(webSocket -> {
                     this.ws = webSocket;
-                    return this;
-                });
+                    return authenticate(webSocket);
+                })
+                .thenApply(ignored -> this);
     }
 
-    /** Blocking convenience: connect and return {@code this}. */
+    /** Blocking convenience: connect (including auth) and return {@code this}. */
     public TelloClient connectBlocking() {
-        return connect().join();
+        try {
+            return connect().join();
+        } catch (CompletionException e) {
+            // Surface the SDK exception directly rather than the join wrapper.
+            if (e.getCause() instanceof TelloException te) {
+                throw te;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Send the {@code authenticate} frame as the first application frame, then wait
+     * (bounded by the connect timeout) for the server's {@code auth.ok}. Auth failure
+     * or timeout aborts the socket and fails the returned future.
+     */
+    private CompletableFuture<Void> authenticate(WebSocket webSocket) {
+        String frame = Commands.authenticate(config.apiKey(), config.authRequestId());
+        CompletableFuture<Void> sent;
+        synchronized (sendLock) {
+            // First frame on the send chain; business sends chain after it and after auth.
+            sent = sendChain
+                    .handle((v, ex) -> (Void) null)
+                    .thenCompose(ignored -> webSocket.sendText(frame, true).thenApply(w -> (Void) null));
+            sendChain = sent.handle((v, ex) -> (Void) null);
+        }
+        return sent.thenCompose(ignored -> awaitAuthOk());
+    }
+
+    private CompletableFuture<Void> awaitAuthOk() {
+        return authFuture
+                .orTimeout(config.connectTimeoutMillis(), TimeUnit.MILLISECONDS)
+                .handle((v, ex) -> {
+                    if (ex == null) {
+                        return (Void) null;
+                    }
+                    abortQuietly();
+                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null
+                            ? ex.getCause() : ex;
+                    if (cause instanceof TelloException te) {
+                        throw te;
+                    }
+                    if (cause instanceof TimeoutException) {
+                        throw new ConnectionClosedException("timed out waiting for auth.ok");
+                    }
+                    throw new ConnectionClosedException("authentication failed");
+                });
     }
 
     /** Close the connection and wait (bounded) for the receive loop to finish. */
@@ -266,10 +335,14 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         if (webSocket == null) {
             return failed(connectionError());
         }
+        // Withhold every business command until auth.ok. If auth failed, this gate
+        // is already completed exceptionally and the send fails without touching the wire.
+        CompletableFuture<Void> gate = authFuture;
         synchronized (sendLock) {
             // Chain after any in-flight send so no two Text sends overlap.
             CompletableFuture<Void> attempt = sendChain
                     .handle((v, ex) -> (Void) null)
+                    .thenCompose(ignored -> gate)
                     .thenCompose(ignored -> webSocket.sendText(frame, true).thenApply(w -> (Void) null));
             sendChain = attempt.handle((v, ex) -> (Void) null);
             return attempt.exceptionally(ex -> {
@@ -312,11 +385,19 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     }
 
     private void dispatch(TelloEvent event) {
+        // The auth.ok acknowledgement is internal to the connect handshake: unblock
+        // connect() and do not surface it to subscribers.
+        if (EventType.AUTH_OK.equals(event.type())) {
+            completeAuth();
+            return;
+        }
+
         if (event instanceof ErrorEvent err) {
             TelloException exc = Errors.exceptionFor(err.code, err.message, err.question);
             synchronized (lock) {
                 if ("unauthenticated".equals(err.code)) {
                     closeExc = exc;
+                    failAuth(exc);
                 } else if (!NON_ABORTING.contains(err.code) && active) {
                     // The gateway sends no terminal frame for a rejected command, so
                     // unblock waitClosed() with the mapped error instead of hanging.
@@ -370,11 +451,36 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                 closeExc = new ConnectionClosedException("connection closed before call terminated");
             }
         }
+        // A close/error before auth.ok is a connect failure, not a hung future.
+        failAuth(closeExc != null ? closeExc
+                : new ConnectionClosedException("connection closed before authentication"));
         emit(EventType.DISCONNECTED, new Event(EventType.DISCONNECTED, "", "", "", "", new JsonObject()));
         synchronized (lock) {
             callFinished = true;
             connectionClosed = true;
             lock.notifyAll();
+        }
+    }
+
+    /** Mark the connect handshake as acknowledged (server sent {@code auth.ok}). */
+    private void completeAuth() {
+        authFuture.complete(null);
+    }
+
+    /** Fail the connect handshake; a no-op once already resolved. */
+    private void failAuth(TelloException e) {
+        authFuture.completeExceptionally(e);
+    }
+
+    /** Abort the socket without surfacing the API key anywhere. */
+    private void abortQuietly() {
+        WebSocket webSocket = ws;
+        if (webSocket != null) {
+            try {
+                webSocket.abort();
+            } catch (RuntimeException ignored) {
+                // already closing/closed
+            }
         }
     }
 

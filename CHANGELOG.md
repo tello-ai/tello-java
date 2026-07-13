@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Changed (in-band authenticate handshake)
+
+- Authentication moved off the WS upgrade and into the connection itself. The
+  upgrade no longer sends an `Authorization: Bearer` header (or any `?token=`
+  query), so the API key never appears in the URL, headers, logs, or exception
+  messages.
+- After the socket opens, `connect()` now sends an `authenticate` frame
+  (`{"event":"authenticate","data":{"apiKey":"…","requestId":"…?"}}`) as its first
+  application frame and withholds every other command until the server replies
+  `{"type":"auth.ok",…}`. This is internal: the public API is unchanged — build a
+  `TelloClient` and call `connect()` / `connectBlocking()` exactly as before.
+- `connect()` fails (throws a `TelloException` from `connectBlocking()`) on an
+  `unauthenticated` error frame, a close 4401, or an `auth.ok` wait timeout (bounded
+  by the existing connect timeout). `auth.ok` is consumed internally and not
+  re-emitted to subscribers.
+- `Commands.authenticate(apiKey, requestId)` added; `EventType.AUTH_OK` added;
+  optional `ClientConfig` auth `requestId` constructor added.
+
 ### Changed (camelCase wire contract)
 
 - Inbound frames now use camelCase wire keys (`sessionId`, `callId`, `turnIndex`,
@@ -18,8 +36,8 @@
 
 - Initial WS realtime client for turn-provider-gateway `/sdk`, ported from
   `tello-python` (behaviour 1:1 with the gateway).
-- `TelloClient`: connect (Bearer auth), `createCall` / `answer` / `cancel`,
-  pub/sub event handlers (`on`), `waitClosed`.
+- `TelloClient`: connect (in-band `authenticate` handshake), `createCall` /
+  `answer` / `cancel`, pub/sub event handlers (`on`), `waitClosed`.
 - Event parsing for `user.turn` / `agent.turn` / `call.status_changed` (now
   `call.statusChanged`) / `call.completed` / `call.no_answer` (now
   `call.noAnswer`) / `call.failed` / `error`.

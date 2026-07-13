@@ -15,6 +15,22 @@ class CommandsTest {
     }
 
     @Test
+    void authenticateUsesEnvelopeAndCarriesApiKey() {
+        JsonObject frame = parse(Commands.authenticate("tello_live_xxx", "auth-1"));
+        assertEquals("authenticate", frame.get("event").getAsString());
+        JsonObject data = frame.getAsJsonObject("data");
+        assertEquals("tello_live_xxx", data.get("apiKey").getAsString());
+        assertEquals("auth-1", data.get("requestId").getAsString());
+    }
+
+    @Test
+    void authenticateOmitsRequestIdWhenAbsent() {
+        JsonObject data = parse(Commands.authenticate("tello_live_xxx", null)).getAsJsonObject("data");
+        assertEquals("tello_live_xxx", data.get("apiKey").getAsString());
+        assertFalse(data.has("requestId"));
+    }
+
+    @Test
     void createCallUsesEnvelopeAndCamelCase() {
         JsonObject frame = parse(Commands.createCall("+821012345678", "agent-1", "hi", Map.of("src", "test"), "r1"));
         assertEquals("createCall", frame.get("event").getAsString());
