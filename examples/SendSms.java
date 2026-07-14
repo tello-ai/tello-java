@@ -46,7 +46,7 @@ public class SendSms {
             });
 
             // Do not retry: SMS delivery is a real side effect and requestId is not an idempotency key.
-            client.sendSms(config.smsTo, config.message, null, requestId).join();
+            client.sendSms(config.smsTo, config.message, requestId).join();
 
             if (!response.await(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("timed out waiting for sms.sent");

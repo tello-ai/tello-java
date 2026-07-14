@@ -16,9 +16,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * End-to-end coverage of the internal WebSocket auth handshake against a local
- * {@link FakeGateway}: the {@code authenticate} frame is first, no key leaks onto
- * the upgrade, business commands wait for {@code auth.ok}, and every auth failure
- * mode (error frame, close 4401, timeout) surfaces as a connect failure.
+ * {@link FakeGateway}: the {@code auth} frame is first (raw key in {@code token}),
+ * no key leaks onto the upgrade, business commands wait for {@code auth.ok}, and
+ * every auth failure mode (error frame, close 4401, timeout) surfaces as a connect
+ * failure.
  */
 class AuthHandshakeTest {
 
@@ -30,13 +31,13 @@ class AuthHandshakeTest {
     }
 
     @Test
-    void authenticateIsFirstFrameAndCarriesApiKey() throws Exception {
+    void authIsFirstFrameAndCarriesToken() throws Exception {
         try (FakeGateway server = FakeGateway.start()) {
             server.onText(msg -> sendQuietly(server, AUTH_OK));
             try (TelloClient client = new TelloClient(API_KEY, server.url()).connectBlocking()) {
                 JsonObject frame = parse(server.take());
-                assertEquals("authenticate", frame.get("event").getAsString());
-                assertEquals(API_KEY, frame.getAsJsonObject("data").get("apiKey").getAsString());
+                assertEquals("auth", frame.get("event").getAsString());
+                assertEquals(API_KEY, frame.getAsJsonObject("data").get("token").getAsString());
             }
         }
     }
@@ -64,8 +65,8 @@ class AuthHandshakeTest {
             TelloClient client = new TelloClient(API_KEY, server.url());
             CompletableFuture<TelloClient> connected = client.connect();
 
-            // The authenticate frame proves the socket is open and the key was sent.
-            assertEquals("authenticate", parse(server.take()).get("event").getAsString());
+            // The auth frame proves the socket is open and the key was sent.
+            assertEquals("auth", parse(server.take()).get("event").getAsString());
 
             CompletableFuture<Void> call = client.createCall("+821012345678", "agent-1");
             assertNull(server.poll(400), "no business command may be sent before auth.ok");
@@ -106,7 +107,7 @@ class AuthHandshakeTest {
     @Test
     void authOkTimeoutFailsConnect() throws Exception {
         try (FakeGateway server = FakeGateway.start()) {
-            // Server never acknowledges the authenticate frame.
+            // Server never acknowledges the auth frame.
             ClientConfig config = new ClientConfig(API_KEY, server.url(), 300L);
             TelloException ex = assertThrows(TelloException.class,
                     () -> new TelloClient(config).connectBlocking());

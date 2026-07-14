@@ -46,6 +46,17 @@ class EventParserTest {
     }
 
     @Test
+    void parsesDtmfAcceptedWithDigitsAndRequestCorrelation() {
+        TelloEvent e = EventParser.parse(obj(
+                "{\"type\":\"dtmf.accepted\",\"version\":\"1.0\",\"requestId\":\"dtmf-1\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"messageId\":\"message-1\",\"digits\":\"1234#\",\"timestamp\":\"t\"}"));
+        DtmfAcceptedEvent accepted = assertInstanceOf(DtmfAcceptedEvent.class, e);
+        assertEquals("dtmf-1", accepted.requestId);
+        assertEquals("message-1", accepted.messageId);
+        assertEquals("1234#", accepted.digits);
+        assertEquals("c1", accepted.callId);
+    }
+
+    @Test
     void parsesStatusChangedWithPreviousStatus() {
         TelloEvent e = EventParser.parse(obj(
                 "{\"type\":\"call.statusChanged\",\"version\":\"1.0\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"status\":\"inProgress\",\"previousStatus\":\"ringing\",\"timestamp\":\"t\"}"));

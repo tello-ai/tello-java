@@ -49,8 +49,9 @@ import java.util.concurrent.TimeoutException;
  * <p>Design notes:
  * <ul>
  *   <li>Authentication is internal to {@link #connect()}: once the socket opens the
- *       client sends an {@code authenticate} frame as its first application frame and
- *       withholds every other command until the server returns {@code auth.ok}. A
+ *       client sends an {@code auth} frame (raw key in its {@code token} field) as its
+ *       first application frame and withholds every other command until the server
+ *       returns {@code auth.ok}. A
  *       rejected key ({@code unauthenticated} error frame or close 4401) or an
  *       {@code auth.ok} wait timeout makes {@code connect()} fail; the API key is
  *       never placed in the URL, a header, a log line, or an exception message.</li>
@@ -85,7 +86,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private volatile WebSocket ws;
 
     /**
-     * Completes when the server acknowledges the {@code authenticate} handshake with
+     * Completes when the server acknowledges the {@code auth} handshake with
      * {@code auth.ok}, or completes exceptionally on an auth failure / timeout. Every
      * outbound business command waits on it, so nothing is sent before {@code auth.ok}.
      */
@@ -130,7 +131,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      * Open the WS connection, authenticate, and start receiving.
      *
      * <p>The returned future completes only after the server has acknowledged the
-     * internal {@code authenticate} handshake with {@code auth.ok}. It completes
+     * internal {@code auth} handshake with {@code auth.ok}. It completes
      * exceptionally — with a {@link ai.tello.errors.TelloException} — if the key is
      * rejected ({@code unauthenticated} error frame or close 4401) or {@code auth.ok}
      * does not arrive within the configured connect timeout.
@@ -173,12 +174,12 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     }
 
     /**
-     * Send the {@code authenticate} frame as the first application frame, then wait
+     * Send the {@code auth} frame as the first application frame, then wait
      * (bounded by the connect timeout) for the server's {@code auth.ok}. Auth failure
      * or timeout aborts the socket and fails the returned future.
      */
     private CompletableFuture<Void> authenticate(WebSocket webSocket) {
-        String frame = Commands.authenticate(config.apiKey(), config.authRequestId());
+        String frame = Commands.auth(config.apiKey(), config.authRequestId());
         CompletableFuture<Void> sent;
         synchronized (sendLock) {
             // First frame on the send chain; business sends chain after it and after auth.
@@ -323,11 +324,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     }
 
     public CompletableFuture<Void> sendSms(String to, String message) {
-        return sendSms(to, message, null, null);
+        return sendSms(to, message, null);
     }
 
-    public CompletableFuture<Void> sendSms(String to, String message, String callId, String requestId) {
-        return send(Commands.sendSms(to, message, callId, requestId));
+    public CompletableFuture<Void> sendSms(String to, String message, String requestId) {
+        return send(Commands.sendSms(to, message, requestId));
     }
 
     private CompletableFuture<Void> send(String frame) {

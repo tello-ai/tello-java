@@ -45,6 +45,19 @@ public final class EventParser {
                     frame);
         }
 
+        if (EventType.DTMF_ACCEPTED.equals(type)) {
+            return new DtmfAcceptedEvent(
+                    type,
+                    str(frame, "version", ""),
+                    strOrNull(frame, "requestId"),
+                    str(frame, "sessionId", ""),
+                    str(frame, "callId", ""),
+                    str(frame, "messageId", ""),
+                    str(frame, "digits", ""),
+                    str(frame, "timestamp", ""),
+                    frame);
+        }
+
         if (EventType.AGENTS_LISTED.equals(type)) {
             return new AgentsListedEvent(
                     type,

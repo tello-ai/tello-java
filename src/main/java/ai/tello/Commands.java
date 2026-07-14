@@ -21,16 +21,16 @@ public final class Commands {
     /**
      * The authentication handshake frame. It MUST be the first frame a client sends
      * after the socket opens; no other command may be sent until the server replies
-     * with {@code auth.ok}. The API key travels only in this frame body — never in a
-     * URL query or upgrade header.
+     * with {@code auth.ok}. The raw API key travels only in this frame body's
+     * {@code token} field — never in a URL query or upgrade header.
      */
-    public static String authenticate(String apiKey, String requestId) {
+    public static String auth(String apiKey, String requestId) {
         JsonObject data = new JsonObject();
-        data.addProperty("apiKey", apiKey);
+        data.addProperty("token", apiKey);
         if (requestId != null) {
             data.addProperty("requestId", requestId);
         }
-        return envelope("authenticate", data);
+        return envelope("auth", data);
     }
 
     public static String createCall(String to, String agentId, String prompt, Map<String, ?> metadata, String requestId) {
@@ -92,13 +92,10 @@ public final class Commands {
         return envelope("getSummary", data);
     }
 
-    public static String sendSms(String to, String message, String callId, String requestId) {
+    public static String sendSms(String to, String message, String requestId) {
         JsonObject data = new JsonObject();
         data.addProperty("to", to);
         data.addProperty("message", message);
-        if (callId != null) {
-            data.addProperty("callId", callId);
-        }
         if (requestId != null) {
             data.addProperty("requestId", requestId);
         }

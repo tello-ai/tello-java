@@ -3,9 +3,9 @@ package ai.tello;
 /**
  * Connection settings for {@link TelloClient}.
  *
- * <p>{@code apiKey} is sent only inside the {@code authenticate} handshake frame
- * (the first application frame after the socket opens) — never as an upgrade
- * header or a URL query parameter. {@code url} is the gateway {@code /sdk}
+ * <p>{@code apiKey} is sent only inside the {@code auth} handshake frame's
+ * {@code token} field (the first application frame after the socket opens) — never
+ * as an upgrade header or a URL query parameter. {@code url} is the gateway {@code /sdk}
  * endpoint. {@code connectTimeoutMillis} bounds both the socket open and the wait
  * for the server's {@code auth.ok}.
  */

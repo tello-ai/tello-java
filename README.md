@@ -24,9 +24,9 @@ the built-in `java.net.http.WebSocket`.
 
 ## 2. API key
 
-Sent in-band: after the socket opens the client sends an `authenticate` frame as
-its first application frame, and `connect()` completes only once the server
-returns `auth.ok`. The key is never placed on the WS upgrade request (no
+Sent in-band: after the socket opens the client sends an `auth` frame (the raw key
+in its `token` field) as its first application frame, and `connect()` completes only
+once the server returns `auth.ok`. The key is never placed on the WS upgrade request (no
 `Authorization` header, no `?token=` query), so it stays out of URLs, logs, and
 exception messages. This is internal — you do not call it. Pass the key explicitly
 or via `TELLO_API_KEY` / `TELLO_URL` environment variables (a no-arg

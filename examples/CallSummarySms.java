@@ -177,7 +177,7 @@ public class CallSummarySms {
             }
 
             // Do not retry: this scenario sends exactly one real SMS after a completed call.
-            client.sendSms(config.smsTo, config.message, callId, smsRequestId).join();
+            client.sendSms(config.smsTo, config.message, smsRequestId).join();
             if (!smsResponse.await(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("timed out waiting for sms.sent");
             }

@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 
 /**
  * Minimal RFC 6455 WebSocket server for exercising {@link TelloClient}'s connect /
- * authenticate handshake. It performs the upgrade, records the request line and
+ * auth handshake. It performs the upgrade, records the request line and
  * headers, queues every inbound text frame, and lets a test drive replies either
  * manually or via an {@link #onText(Consumer)} auto-responder.
  *

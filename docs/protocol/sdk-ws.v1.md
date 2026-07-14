@@ -20,11 +20,11 @@ ws(s)://<host>:<port>/sdk
 API key는 **HTTP upgrade에 싣지 않는다**. upgrade 요청에 `Authorization` 헤더나
 `?token=` 쿼리를 붙이지 않으며, key가 URL·헤더·로그·예외 메시지에 노출되어서는 안 된다.
 
-소켓이 열리면 클라이언트가 보내는 **첫 애플리케이션 프레임**은 반드시 `authenticate`다.
+소켓이 열리면 클라이언트가 보내는 **첫 애플리케이션 프레임**은 반드시 `auth`다.
 
 ```json
-{ "event": "authenticate", "data": {
-  "apiKey": "<TELLO_API_KEY>",     // 필수
+{ "event": "auth", "data": {
+  "token": "<TELLO_API_KEY>",      // 필수. 원본 API key
   "requestId": "<optional>"        // 선택; auth.ok에 에코
 }}
 ```
@@ -34,7 +34,7 @@ API key는 **HTTP upgrade에 싣지 않는다**. upgrade 요청에 `Authorizatio
 보내지 않는다.
 
 ```json
-{ "type": "auth.ok", "version": "1.0", "requestId": "<echoed when supplied>" }
+{ "type": "auth.ok", "version": "1.0", "accountId": "...", "requestId": "<echoed when supplied>" }
 ```
 
 인증 실패 시 서버는 `error` 프레임(`code: "unauthenticated"`)을 보내거나 close code

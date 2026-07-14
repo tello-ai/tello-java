@@ -15,18 +15,19 @@ class CommandsTest {
     }
 
     @Test
-    void authenticateUsesEnvelopeAndCarriesApiKey() {
-        JsonObject frame = parse(Commands.authenticate("tello_live_xxx", "auth-1"));
-        assertEquals("authenticate", frame.get("event").getAsString());
+    void authUsesEnvelopeAndCarriesTokenKey() {
+        JsonObject frame = parse(Commands.auth("tello_live_xxx", "auth-1"));
+        assertEquals("auth", frame.get("event").getAsString());
         JsonObject data = frame.getAsJsonObject("data");
-        assertEquals("tello_live_xxx", data.get("apiKey").getAsString());
+        assertEquals("tello_live_xxx", data.get("token").getAsString());
+        assertFalse(data.has("apiKey"));
         assertEquals("auth-1", data.get("requestId").getAsString());
     }
 
     @Test
-    void authenticateOmitsRequestIdWhenAbsent() {
-        JsonObject data = parse(Commands.authenticate("tello_live_xxx", null)).getAsJsonObject("data");
-        assertEquals("tello_live_xxx", data.get("apiKey").getAsString());
+    void authOmitsRequestIdWhenAbsent() {
+        JsonObject data = parse(Commands.auth("tello_live_xxx", null)).getAsJsonObject("data");
+        assertEquals("tello_live_xxx", data.get("token").getAsString());
         assertFalse(data.has("requestId"));
     }
 
@@ -96,12 +97,12 @@ class CommandsTest {
         assertEquals("call-1", summary.getAsJsonObject("data").get("callId").getAsString());
         assertEquals("summary-1", summary.getAsJsonObject("data").get("requestId").getAsString());
 
-        JsonObject sms = parse(Commands.sendSms("01012345678", "예약 확인", "call-1", "sms-1"));
+        JsonObject sms = parse(Commands.sendSms("01012345678", "예약 확인", "sms-1"));
         JsonObject data = sms.getAsJsonObject("data");
         assertEquals("sendSms", sms.get("event").getAsString());
         assertEquals("01012345678", data.get("to").getAsString());
         assertEquals("예약 확인", data.get("message").getAsString());
-        assertEquals("call-1", data.get("callId").getAsString());
+        assertFalse(data.has("callId"));
         assertEquals("sms-1", data.get("requestId").getAsString());
     }
 }
