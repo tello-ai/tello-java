@@ -1,11 +1,7 @@
 package ai.tello.events;
 
 import ai.tello.EventType;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -55,15 +51,6 @@ public final class EventParser {
                     str(frame, "messageId", ""),
                     str(frame, "digits", ""),
                     str(frame, "timestamp", ""),
-                    frame);
-        }
-
-        if (EventType.AGENTS_LISTED.equals(type)) {
-            return new AgentsListedEvent(
-                    type,
-                    str(frame, "version", ""),
-                    strOrNull(frame, "requestId"),
-                    agents(frame),
                     frame);
         }
 
@@ -152,31 +139,5 @@ public final class EventParser {
             return o.get(key).getAsInt();
         }
         return null;
-    }
-
-    private static boolean boolVal(JsonObject o, String key) {
-        return o.has(key) && o.get(key).isJsonPrimitive() && o.getAsJsonPrimitive(key).isBoolean()
-                && o.get(key).getAsBoolean();
-    }
-
-    private static List<AgentInfo> agents(JsonObject frame) {
-        if (!frame.has("agents") || !frame.get("agents").isJsonArray()) {
-            return List.of();
-        }
-        JsonArray rows = frame.getAsJsonArray("agents");
-        List<AgentInfo> agents = new ArrayList<>(rows.size());
-        for (JsonElement row : rows) {
-            if (!row.isJsonObject()) {
-                continue;
-            }
-            JsonObject agent = row.getAsJsonObject();
-            agents.add(new AgentInfo(
-                    str(agent, "agentId", ""),
-                    str(agent, "name", ""),
-                    str(agent, "role", ""),
-                    boolVal(agent, "isDefault"),
-                    str(agent, "status", "")));
-        }
-        return agents;
     }
 }

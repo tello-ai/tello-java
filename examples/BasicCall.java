@@ -27,7 +27,7 @@ public class BasicCall {
                 System.out.println("[error] " + err.code + ": " + err.message);
             });
 
-            client.createCall("+821012345678", "agent-1", "예약 확인").join();
+            client.createCall("+821012345678", "예약 확인").join();
             client.waitClosed();
         }
     }

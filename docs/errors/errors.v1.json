@@ -15,7 +15,6 @@
     { "code": "unauthenticated", "message": "Authentication required", "closeCode": 4401, "sdkException": "AuthenticationError" },
     { "code": "callAlreadyActive", "message": "A call is already active", "sdkException": "CallAlreadyActiveError" },
     { "code": "toRequired", "message": "to is required", "sdkException": "ValidationError" },
-    { "code": "agentIdRequired", "message": "agentId is required", "sdkException": "ValidationError" },
     { "code": "noActiveCall", "message": "No active call", "sdkException": "NoActiveCallError" },
     { "code": "callRejected", "message": "Call rejected", "sdkException": "CallRejectedError", "extra": ["question"] },
     { "code": "internalError", "message": "Internal error", "sdkException": "TelloServerError" }

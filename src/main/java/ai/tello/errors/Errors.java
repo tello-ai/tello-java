@@ -13,7 +13,6 @@ public final class Errors {
             case "unauthenticated":
                 return new AuthenticationException(message);
             case "toRequired":
-            case "agentIdRequired":
                 return new ValidationException(message);
             case "callAlreadyActive":
                 return new CallAlreadyActiveException(message);

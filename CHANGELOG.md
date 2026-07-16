@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Removed (breaking — agent selection off the SDK path)
+
+- `createCall` no longer takes an `agentId`: `createCall(to)` / `createCall(to, prompt)` /
+  `createCall(to, prompt, metadata, requestId)`; the frame never carries an `agentId` key.
+- `listAgents` removed entirely (`TelloClient.listAgents`, `Commands.listAgents`,
+  `EventType.AGENTS_LISTED`, `AgentsListedEvent` / `AgentInfo`, and the
+  `agentIdRequired` error mapping) — command and `agents.listed` event dropped from the contract.
+
 ### Changed (in-band auth frame handshake)
 
 - Authentication moved off the WS upgrade and into the connection itself. The

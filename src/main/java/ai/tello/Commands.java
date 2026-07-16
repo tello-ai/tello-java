@@ -33,10 +33,9 @@ public final class Commands {
         return envelope("auth", data);
     }
 
-    public static String createCall(String to, String agentId, String prompt, Map<String, ?> metadata, String requestId) {
+    public static String createCall(String to, String prompt, Map<String, ?> metadata, String requestId) {
         JsonObject data = new JsonObject();
         data.addProperty("to", to);
-        data.addProperty("agentId", agentId);
         data.addProperty("prompt", prompt == null ? "" : prompt);
         if (metadata != null) {
             data.add("metadata", GSON.toJsonTree(metadata));
@@ -73,14 +72,6 @@ public final class Commands {
 
     public static String cancel() {
         return envelope("cancel", new JsonObject());
-    }
-
-    public static String listAgents(String requestId) {
-        JsonObject data = new JsonObject();
-        if (requestId != null) {
-            data.addProperty("requestId", requestId);
-        }
-        return envelope("listAgents", data);
     }
 
     public static String getSummary(String callId, String requestId) {

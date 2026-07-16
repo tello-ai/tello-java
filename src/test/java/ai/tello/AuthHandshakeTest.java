@@ -68,7 +68,7 @@ class AuthHandshakeTest {
             // The auth frame proves the socket is open and the key was sent.
             assertEquals("auth", parse(server.take()).get("event").getAsString());
 
-            CompletableFuture<Void> call = client.createCall("+821012345678", "agent-1");
+            CompletableFuture<Void> call = client.createCall("+821012345678");
             assertNull(server.poll(400), "no business command may be sent before auth.ok");
 
             server.sendText(AUTH_OK);

@@ -33,11 +33,10 @@ class CommandsTest {
 
     @Test
     void createCallUsesEnvelopeAndCamelCase() {
-        JsonObject frame = parse(Commands.createCall("+821012345678", "agent-1", "hi", Map.of("src", "test"), "r1"));
+        JsonObject frame = parse(Commands.createCall("+821012345678", "hi", Map.of("src", "test"), "r1"));
         assertEquals("createCall", frame.get("event").getAsString());
         JsonObject data = frame.getAsJsonObject("data");
         assertEquals("+821012345678", data.get("to").getAsString());
-        assertEquals("agent-1", data.get("agentId").getAsString());
         assertEquals("hi", data.get("prompt").getAsString());
         assertEquals("test", data.getAsJsonObject("metadata").get("src").getAsString());
         assertEquals("r1", data.get("requestId").getAsString());
@@ -45,10 +44,20 @@ class CommandsTest {
 
     @Test
     void createCallOmitsOptionalFields() {
-        JsonObject data = parse(Commands.createCall("+821012345678", "agent-1", "", null, null)).getAsJsonObject("data");
+        JsonObject data = parse(Commands.createCall("+821012345678", "", null, null)).getAsJsonObject("data");
         assertEquals("+821012345678", data.get("to").getAsString());
         assertFalse(data.has("metadata"));
         assertFalse(data.has("requestId"));
+    }
+
+    @Test
+    void createCallNeverCarriesAgentId() {
+        // Contract: the gateway ignores agentId on the SDK path; the frame must not include the key at all.
+        JsonObject withOptions = parse(Commands.createCall("+821012345678", "hi", Map.of("src", "test"), "r1"))
+                .getAsJsonObject("data");
+        assertFalse(withOptions.has("agentId"));
+        JsonObject minimal = parse(Commands.createCall("+821012345678", "", null, null)).getAsJsonObject("data");
+        assertFalse(minimal.has("agentId"));
     }
 
     @Test
@@ -74,19 +83,6 @@ class CommandsTest {
         JsonObject data = parse(Commands.sendDtmf("5678", null, null)).getAsJsonObject("data");
         assertEquals("5678", data.get("digits").getAsString());
         assertFalse(data.has("messageId"));
-        assertFalse(data.has("requestId"));
-    }
-
-    @Test
-    void listAgentsFrameUsesRequestIdWhenProvided() {
-        JsonObject frame = parse(Commands.listAgents("agents-1"));
-        assertEquals("listAgents", frame.get("event").getAsString());
-        assertEquals("agents-1", frame.getAsJsonObject("data").get("requestId").getAsString());
-    }
-
-    @Test
-    void listAgentsFrameOmitsEmptyRequestId() {
-        JsonObject data = parse(Commands.listAgents(null)).getAsJsonObject("data");
         assertFalse(data.has("requestId"));
     }
 

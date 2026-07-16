@@ -17,7 +17,6 @@ WebSocket connection.
 | `TELLO_API_KEY` | both | Gateway API key. |
 | `TELLO_URL` | both | Absolute `ws://` or `wss://` gateway `/sdk` URL. Use `wss://` outside a controlled local environment. |
 | `LIVE_SMS_TO` | both | Controlled recipient for the real SMS. |
-| `TELLO_AGENT_ID` | `CallSummarySms` | Agent to use for the real call. |
 | `LIVE_CALL_TO` | `CallSummarySms` | Controlled recipient who will answer the real call. |
 | `LIVE_CALL_TIMEOUT_SECONDS` | `CallSummarySms` | Positive timeout; on expiry the example attempts one `cancel` and fails. |
 | `LIVE_CALL_PROMPT` | `CallSummarySms`, optional | Prompt supplied when the live call is created. |

@@ -151,7 +151,7 @@ public class CallSummarySms {
                 smsResponse.countDown();
             });
 
-            client.createCall(config.callTo, config.agentId, config.prompt).join();
+            client.createCall(config.callTo, config.prompt).join();
             if (!callCreated.await(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 cancelAfterTimeout(client, "call.created");
                 throw new IllegalStateException("timed out waiting for call.created");
@@ -214,14 +214,13 @@ public class CallSummarySms {
         }
     }
 
-    private record Config(String apiKey, String url, String agentId, String callTo, String smsTo,
+    private record Config(String apiKey, String url, String callTo, String smsTo,
                           String message, String reply, String prompt, long callTimeoutSeconds) {
         static Config fromEnvironment() {
             requireLiveSideEffects();
             return new Config(
                     required("TELLO_API_KEY"),
                     requiredWebSocketUrl("TELLO_URL"),
-                    required("TELLO_AGENT_ID"),
                     required("LIVE_CALL_TO"),
                     required("LIVE_SMS_TO"),
                     optional("LIVE_SMS_MESSAGE", "[Tello live test] Call summary was retrieved."),

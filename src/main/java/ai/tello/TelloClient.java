@@ -35,7 +35,7 @@ import java.util.concurrent.TimeoutException;
  * <pre>{@code
  * try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000/sdk").connectBlocking()) {
  *     client.on(EventType.USER_TURN, e -> client.answer("확인했습니다."));
- *     client.createCall("+821012345678", "agent-1", "예약 확인").join();
+ *     client.createCall("+821012345678", "예약 확인").join();
  *     client.waitClosed();
  * }
  * }</pre>
@@ -268,15 +268,15 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     // -- commands ----------------------------------------------------------
 
-    public CompletableFuture<Void> createCall(String to, String agentId) {
-        return createCall(to, agentId, "", null, null);
+    public CompletableFuture<Void> createCall(String to) {
+        return createCall(to, "", null, null);
     }
 
-    public CompletableFuture<Void> createCall(String to, String agentId, String prompt) {
-        return createCall(to, agentId, prompt, null, null);
+    public CompletableFuture<Void> createCall(String to, String prompt) {
+        return createCall(to, prompt, null, null);
     }
 
-    public CompletableFuture<Void> createCall(String to, String agentId, String prompt,
+    public CompletableFuture<Void> createCall(String to, String prompt,
                                               Map<String, ?> metadata, String requestId) {
         synchronized (lock) {
             callGen++;
@@ -284,7 +284,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
             callError = null;
             active = true;
         }
-        return send(Commands.createCall(to, agentId, prompt, metadata, requestId));
+        return send(Commands.createCall(to, prompt, metadata, requestId));
     }
 
     public CompletableFuture<Void> answer(String text) {
@@ -305,14 +305,6 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     public CompletableFuture<Void> cancel() {
         return send(Commands.cancel());
-    }
-
-    public CompletableFuture<Void> listAgents() {
-        return listAgents(null);
-    }
-
-    public CompletableFuture<Void> listAgents(String requestId) {
-        return send(Commands.listAgents(requestId));
     }
 
     public CompletableFuture<Void> getSummary(String callId) {

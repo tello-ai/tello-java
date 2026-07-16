@@ -76,21 +76,6 @@ class EventParserTest {
     }
 
     @Test
-    void parsesAgentsListed() {
-        TelloEvent e = EventParser.parse(obj(
-                "{\"type\":\"agents.listed\",\"version\":\"1.0\",\"requestId\":\"agents-1\",\"agents\":[{\"agentId\":\"agent-1\",\"name\":\"예약 확인\",\"role\":\"AI 상담원\",\"isDefault\":true,\"status\":\"published\"}]}"));
-        AgentsListedEvent listed = assertInstanceOf(AgentsListedEvent.class, e);
-        assertEquals("agents-1", listed.requestId);
-        assertEquals(1, listed.agents.size());
-        AgentInfo agent = listed.agents.get(0);
-        assertEquals("agent-1", agent.agentId);
-        assertEquals("예약 확인", agent.name);
-        assertEquals("AI 상담원", agent.role);
-        assertTrue(agent.isDefault);
-        assertEquals("published", agent.status);
-    }
-
-    @Test
     void parsesCallSummaryAndSmsSent() {
         TelloEvent summaryEvent = EventParser.parse(obj(
                 "{\"type\":\"call.summary\",\"version\":\"1.0\",\"requestId\":\"summary-1\",\"callId\":\"call-1\",\"status\":\"completed\",\"durationSeconds\":42,\"transcript\":\"고객: 예약 확인\",\"summary\":\"예약 확인 완료\",\"creditCharged\":15}"));

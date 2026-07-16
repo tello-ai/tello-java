@@ -30,7 +30,7 @@ API key는 **HTTP upgrade에 싣지 않는다**. upgrade 요청에 `Authorizatio
 ```
 
 서버가 `auth.ok`를 돌려줄 때까지 클라이언트는 다른 어떤 명령(`createCall` /
-`listAgents` / `answer` / `sendDtmf` / `cancel` / `getSummary` / `sendSms`)도
+`answer` / `sendDtmf` / `cancel` / `getSummary` / `sendSms`)도
 보내지 않는다.
 
 ```json
@@ -64,7 +64,6 @@ API key는 **HTTP upgrade에 싣지 않는다**. upgrade 요청에 `Authorizatio
 ```json
 { "event": "createCall", "data": {
   "to": "+821012345678",          // 필수. 전화할 대상 번호. 비면 error: toRequired
-  "agentId": "agent-1",           // 필수. 비면 error: agentIdRequired
   "prompt": "예약 확인",           // 선택, 기본 ""
   "metadata": { "any": "json" },  // 선택
   "requestId": "req-1"            // 선택
@@ -138,7 +137,6 @@ status 어휘: `queued`, `dialing`, `ringing`, `inProgress`, `transferring`, `co
 | `unauthenticated` | Authentication required | 연결 시 발생, close 4401 동반 |
 | `callAlreadyActive` | A call is already active | |
 | `toRequired` | to is required | |
-| `agentIdRequired` | agentId is required | |
 | `noActiveCall` | No active call | |
 | `dtmfDigitsRequired` | digits is required | `sendDtmf`에 `digits` 누락 |
 | `dtmfDigitsInvalid` | digits must contain only 0-9, *, # | `sendDtmf` `digits`에 허용 외 문자 |
