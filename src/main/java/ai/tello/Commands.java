@@ -83,16 +83,6 @@ public final class Commands {
         return envelope("getSummary", data);
     }
 
-    public static String sendSms(String to, String message, String requestId) {
-        JsonObject data = new JsonObject();
-        data.addProperty("to", to);
-        data.addProperty("message", message);
-        if (requestId != null) {
-            data.addProperty("requestId", requestId);
-        }
-        return envelope("sendSms", data);
-    }
-
     private static String envelope(String event, JsonElement data) {
         JsonObject frame = new JsonObject();
         frame.addProperty("event", event);

@@ -30,7 +30,7 @@ API key는 **HTTP upgrade에 싣지 않는다**. upgrade 요청에 `Authorizatio
 ```
 
 서버가 `auth.ok`를 돌려줄 때까지 클라이언트는 다른 어떤 명령(`createCall` /
-`answer` / `sendDtmf` / `cancel` / `getSummary` / `sendSms`)도
+`answer` / `sendDtmf` / `cancel` / `getSummary`)도
 보내지 않는다.
 
 ```json

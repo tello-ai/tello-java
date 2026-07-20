@@ -315,14 +315,6 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         return send(Commands.getSummary(callId, requestId));
     }
 
-    public CompletableFuture<Void> sendSms(String to, String message) {
-        return sendSms(to, message, null);
-    }
-
-    public CompletableFuture<Void> sendSms(String to, String message, String requestId) {
-        return send(Commands.sendSms(to, message, requestId));
-    }
-
     private CompletableFuture<Void> send(String frame) {
         WebSocket webSocket = ws;
         if (webSocket == null) {

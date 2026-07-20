@@ -68,19 +68,6 @@ public final class EventParser {
                     frame);
         }
 
-        if (EventType.SMS_SENT.equals(type)) {
-            return new SmsSentEvent(
-                    type,
-                    str(frame, "version", ""),
-                    strOrNull(frame, "requestId"),
-                    str(frame, "smsId", ""),
-                    str(frame, "status", ""),
-                    str(frame, "to", ""),
-                    str(frame, "messagePreview", ""),
-                    strOrNull(frame, "callId"),
-                    frame);
-        }
-
         String version = str(frame, "version", "");
         String sessionId = str(frame, "sessionId", "");
         String callId = str(frame, "callId", "");

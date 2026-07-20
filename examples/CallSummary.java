@@ -1,4 +1,4 @@
-// Live integration example: places one real call, retrieves its summary, then sends one real SMS.
+// Live integration example: places one real call and retrieves its summary.
 // Not part of the Gradle build.
 
 import ai.tello.EventType;
@@ -7,7 +7,6 @@ import ai.tello.events.AnswerAcceptedEvent;
 import ai.tello.events.CallSummaryEvent;
 import ai.tello.events.ErrorEvent;
 import ai.tello.events.Event;
-import ai.tello.events.SmsSentEvent;
 import ai.tello.events.StatusChangedEvent;
 import ai.tello.events.TerminalEvent;
 import ai.tello.events.TurnEvent;
@@ -20,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class CallSummarySms {
+public class CallSummary {
 
     private static final long RESPONSE_TIMEOUT_SECONDS = 30;
 
@@ -34,9 +33,7 @@ public class CallSummarySms {
         CountDownLatch callCreated = new CountDownLatch(1);
         CountDownLatch callTerminal = new CountDownLatch(1);
         CountDownLatch summaryResponse = new CountDownLatch(1);
-        CountDownLatch smsResponse = new CountDownLatch(1);
         String summaryRequestId = "live-summary-" + UUID.randomUUID();
-        String smsRequestId = "live-summary-sms-" + UUID.randomUUID();
 
         try (TelloClient client = new TelloClient(config.apiKey, config.url).connectBlocking()) {
             client.on(EventType.USER_TURN, event -> {
@@ -45,7 +42,7 @@ public class CallSummarySms {
                 String callId = createdCallId.get();
                 if (callId == null || !callId.equals(turn.callId)) {
                     failAll(failure, "user.turn arrived before matching call.created",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 String answerRequestId = "live-answer-" + UUID.randomUUID();
@@ -53,7 +50,7 @@ public class CallSummarySms {
                 // Do not retry: each answer becomes audible to the caller.
                 client.answer(config.reply, null, answerRequestId).exceptionally(error -> {
                     failAll(failure, "could not send answer: " + error.getMessage(),
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return null;
                 });
             });
@@ -61,7 +58,7 @@ public class CallSummarySms {
                 Event created = (Event) event;
                 if (created.callId == null || created.callId.isBlank()) {
                     failAll(failure, "call.created did not include callId",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 createdCallId.set(created.callId);
@@ -80,12 +77,12 @@ public class CallSummarySms {
                 TurnEvent turn = (TurnEvent) event;
                 if (!turn.callId.equals(createdCallId.get())) {
                     failAll(failure, "agent.turn did not match call.created",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 if (!answers.agentTurnObserved()) {
                     failAll(failure, "agent.turn arrived before its corresponding answer.accepted",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 System.out.println("[agent #" + turn.turnIndex + "] " + turn.text);
@@ -94,35 +91,35 @@ public class CallSummarySms {
                 Event completed = (Event) event;
                 if (completed.callId == null || !completed.callId.equals(createdCallId.get())) {
                     failAll(failure, "call.completed did not match call.created",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 if (!answers.hasAcceptedAnswer() || !answers.allAnswersDelivered()) {
                     failAll(failure, "call.completed arrived before all answer.accepted events and agent.turn were observed",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                     return;
                 }
                 completedCallId.set(completed.callId);
                 callTerminal.countDown();
             });
             client.on(EventType.CALL_NO_ANSWER, event -> failTerminal(
-                    failure, (TerminalEvent) event, callCreated, callTerminal, summaryResponse, smsResponse));
+                    failure, (TerminalEvent) event, callCreated, callTerminal, summaryResponse));
             client.on(EventType.CALL_FAILED, event -> failTerminal(
-                    failure, (TerminalEvent) event, callCreated, callTerminal, summaryResponse, smsResponse));
+                    failure, (TerminalEvent) event, callCreated, callTerminal, summaryResponse));
             client.on(EventType.CALL_STATUS_CHANGED, event -> {
                 StatusChangedEvent status = (StatusChangedEvent) event;
                 if ("cancelled".equals(status.status)) {
                     failAll(failure, "call ended with cancelled status",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                 }
             });
             client.on(EventType.DISCONNECTED, event ->
                     failAll(failure, "WebSocket disconnected before the scenario completed",
-                            callCreated, callTerminal, summaryResponse, smsResponse));
+                            callCreated, callTerminal, summaryResponse));
             client.on(EventType.ERROR, event -> {
                 ErrorEvent error = (ErrorEvent) event;
                 failAll(failure, "gateway error " + error.code + ": " + error.message,
-                        callCreated, callTerminal, summaryResponse, smsResponse);
+                        callCreated, callTerminal, summaryResponse);
             });
             client.on(EventType.CALL_SUMMARY, event -> {
                 CallSummaryEvent summary = (CallSummaryEvent) event;
@@ -131,24 +128,11 @@ public class CallSummarySms {
                 }
                 if (!completedCallId.get().equals(summary.callId)) {
                     failAll(failure, "call.summary callId did not match the completed call",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
+                            callCreated, callTerminal, summaryResponse);
                 } else {
                     callSummary.set(summary);
                 }
                 summaryResponse.countDown();
-            });
-            client.on(EventType.SMS_SENT, event -> {
-                SmsSentEvent sms = (SmsSentEvent) event;
-                if (!smsRequestId.equals(sms.requestId)) {
-                    return;
-                }
-                if (!hasSmsId(sms)) {
-                    failAll(failure, "sms.sent did not include smsId",
-                            callCreated, callTerminal, summaryResponse, smsResponse);
-                } else {
-                    System.out.println("[sms.sent] status=" + sms.status + " smsId=" + sms.smsId);
-                }
-                smsResponse.countDown();
             });
 
             client.createCall(config.callTo, config.prompt).join();
@@ -175,14 +159,7 @@ public class CallSummarySms {
             if (callSummary.get() == null) {
                 throw new IllegalStateException("call.summary was not received");
             }
-
-            // Do not retry: this scenario sends exactly one real SMS after a completed call.
-            client.sendSms(config.smsTo, config.message, smsRequestId).join();
-            if (!smsResponse.await(RESPONSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("timed out waiting for sms.sent");
-            }
-            throwIfFailed(failure);
-            System.out.println("Completed call " + callId + ", retrieved summary, and sent SMS to " + config.smsTo);
+            System.out.println("Completed call " + callId + " and retrieved its summary.");
         }
     }
 
@@ -214,16 +191,14 @@ public class CallSummarySms {
         }
     }
 
-    private record Config(String apiKey, String url, String callTo, String smsTo,
-                          String message, String reply, String prompt, long callTimeoutSeconds) {
+    private record Config(String apiKey, String url, String callTo,
+                          String reply, String prompt, long callTimeoutSeconds) {
         static Config fromEnvironment() {
             requireLiveSideEffects();
             return new Config(
                     required("TELLO_API_KEY"),
                     requiredWebSocketUrl("TELLO_URL"),
                     required("LIVE_CALL_TO"),
-                    required("LIVE_SMS_TO"),
-                    optional("LIVE_SMS_MESSAGE", "[Tello live test] Call summary was retrieved."),
                     optional("LIVE_CALL_REPLY", "확인했습니다. 라이브 테스트 통화를 계속 진행하겠습니다."),
                     optional("LIVE_CALL_PROMPT", "Live test call. Reply to each caller turn."),
                     positiveSeconds("LIVE_CALL_TIMEOUT_SECONDS"));
@@ -233,7 +208,7 @@ public class CallSummarySms {
     private static void requireLiveSideEffects() {
         if (!"true".equals(System.getenv("ALLOW_LIVE_SIDE_EFFECTS"))) {
             throw new IllegalStateException(
-                    "Refusing to place a real call or send a real SMS: set ALLOW_LIVE_SIDE_EFFECTS=true explicitly.");
+                    "Refusing to place a real call: set ALLOW_LIVE_SIDE_EFFECTS=true explicitly.");
         }
     }
 
@@ -275,10 +250,6 @@ public class CallSummarySms {
     private static String optional(String name, String fallback) {
         String value = System.getenv(name);
         return value == null || value.isBlank() ? fallback : value;
-    }
-
-    static boolean hasSmsId(SmsSentEvent sms) {
-        return sms.smsId != null && !sms.smsId.isBlank();
     }
 
     static final class AnswerDeliveryTracker {

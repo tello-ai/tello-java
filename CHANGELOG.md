@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Removed (breaking — SMS off the SDK contract)
+
+- `sendSms` removed entirely (`TelloClient.sendSms(to, message)` /
+  `sendSms(to, message, requestId)`, `Commands.sendSms`, `EventType.SMS_SENT`,
+  and `SmsSentEvent`) — command and `sms.sent` event dropped from the contract.
+  The gateway no longer routes a `sendSms` frame, so an old client that sends one
+  gets no response at all and blocks until its own timeout.
+- Live examples: `SendSms` deleted; `CallSummarySms` / `CallSummarySmsTest`
+  renamed to `CallSummary` / `CallSummaryTest` with the SMS half removed
+  (`getSummary` is unchanged). `LIVE_SMS_TO` / `LIVE_SMS_MESSAGE` dropped from
+  `examples/.env.example`.
+
 ### Removed (breaking — agent selection off the SDK path)
 
 - `createCall` no longer takes an `agentId`: `createCall(to)` / `createCall(to, prompt)` /
@@ -30,9 +42,6 @@
 
 ### Changed (command surface)
 
-- `sendSms` no longer takes a `callId`: `sendSms(to, message)` /
-  `sendSms(to, message, requestId)` (the frame carries only `to` / `message` /
-  optional `requestId`).
 - Added `EventType.DTMF_ACCEPTED` (`dtmf.accepted`) with a typed
   `DtmfAcceptedEvent` (`requestId`, `messageId`, `digits`); `answer.accepted` /
   `call.created` already handled.
