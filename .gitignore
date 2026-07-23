@@ -5,3 +5,6 @@ build/
 *.iml
 *.class
 out/
+
+# Live-example credentials and recipient numbers. Never commit.
+examples/.env
