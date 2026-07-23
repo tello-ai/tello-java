@@ -1,3 +1,5 @@
+**English** | [한국어](README.ko.md)
+
 # tello-java
 
 Tello SDK for Java — a thin **WebSocket** realtime client for the
@@ -50,8 +52,8 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 ```
 
 `connect()` returns a `CompletableFuture<TelloClient>`; `connectBlocking()` is the
-blocking convenience. Commands (`createCall` / `answer` / `cancel`) return
-`CompletableFuture<Void>`.
+blocking convenience. Commands (`createCall` / `answer` / `sendDtmf` / `cancel` /
+`getSummary`) return `CompletableFuture<Void>`.
 
 ## 4. Realtime turn events (pub/sub)
 
@@ -60,14 +62,20 @@ cast to the concrete type:
 
 | `EventType` | value | concrete type / fields |
 | --- | --- | --- |
+| `CALL_CREATED` | `call.created` | `Event` (`callId`, `sessionId`) |
 | `USER_TURN` | `user.turn` | `TurnEvent` (`turnIndex`, `text`) |
 | `AGENT_TURN` | `agent.turn` | `TurnEvent` (`turnIndex`, `text`) |
+| `ANSWER_ACCEPTED` | `answer.accepted` | `AnswerAcceptedEvent` (`requestId`, `messageId`) |
+| `DTMF_ACCEPTED` | `dtmf.accepted` | `DtmfAcceptedEvent` (`requestId`, `messageId`, `digits`) |
+| `CALL_SUMMARY` | `call.summary` | `CallSummaryEvent` (`requestId`, `status`, `durationSeconds`, `transcript`, `summary`, `creditCharged`) |
 | `CALL_STATUS_CHANGED` | `call.statusChanged` | `StatusChangedEvent` (`status`, `previousStatus`) |
 | `CALL_COMPLETED` | `call.completed` | `TerminalEvent` (`status`) |
 | `CALL_NO_ANSWER` | `call.noAnswer` | `TerminalEvent` (`status`, `failureReason`) |
 | `CALL_FAILED` | `call.failed` | `TerminalEvent` (`status`, `failureReason`) |
 | `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`) |
 | `DISCONNECTED` | `disconnected` | `Event` (SDK-local; emitted when the WS closes) |
+
+`AUTH_OK` is consumed internally by `connect()` and never re-emitted.
 
 `waitClosed()` blocks until the call reaches a terminal state (or a cancelled
 status) or the connection closes.
@@ -85,6 +93,9 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | `callRejected` | `CallRejectedException` (with `.question`) |
 | `internalError` | `TelloServerException` |
 
+Any other code (including `callNotFound` and `callNotCompleted`) also maps to
+`TelloServerException`.
+
 Command errors are also delivered to `EventType.ERROR` subscribers without closing
 the socket. `waitClosed()` re-raises the relevant error so a failed `createCall`
 does not hang. Connection drop mid-call → `ConnectionClosedException`; session
@@ -94,6 +105,15 @@ The gateway drives a WS-level ping heartbeat; pongs are sent automatically. Ther
 is no reconnect/resume — treat an abnormal close as reconnect-worthy and restart
 the call.
 
-## 6. Version compatibility
+## 6. Examples
+
+Standalone programs live in [`examples/`](examples/README.md): `BasicCall`
+(connect, one call, answer each turn) and `CallSummary` (gated live scenario
+ending in `call.summary`). They sit outside the Gradle build and are compiled
+with `javac` against the built SDK classes.
+
+They place real calls. Read [`examples/README.md`](examples/README.md) first.
+
+## 7. Version compatibility
 
 `ai.tello:tello-sdk 0.1.x` implements Tello WS protocol `1.0`.
