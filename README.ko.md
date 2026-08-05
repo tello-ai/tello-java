@@ -89,13 +89,36 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (4401 종료 포함) |
 | `toRequired` | `ValidationException` |
+| `callIdRequired` | `ValidationException` |
+| `dtmfDigitsRequired` | `ValidationException` |
+| `dtmfDigitsInvalid` | `ValidationException` |
+| `callNotFound` | `ValidationException` |
+| `callNotCompleted` | `ValidationException` |
 | `callAlreadyActive` | `CallAlreadyActiveException` |
 | `noActiveCall` | `NoActiveCallException` |
 | `callRejected` | `CallRejectedException` (`.question` 포함) |
 | `internalError` | `TelloServerException` |
 
-그 밖의 코드는 `callNotFound`, `callNotCompleted`를 포함해 모두
-`TelloServerException`으로 떨어집니다.
+표에 없는 코드는 `TelloServerException`으로 떨어집니다.
+
+모든 오류는 게이트웨이 코드를 `.code`에 담고 있습니다. **분기는 `.code`로 하고
+`.getMessage()`로는 하지 마세요.** 메시지는 게이트웨이가 다시 쓸 수 있는 표시용
+문자열입니다.
+
+`createCall`은 통화가 만들어지기 전에 거부될 수도 있습니다. 이 경우
+`call.created`도 `callId`도 과금도 없습니다. 게이트웨이는 재시도하지 않으므로
+재시도 정책은 호출자 몫입니다.
+
+| 게이트웨이 `code` | 예외 | 대응 |
+| --- | --- | --- |
+| `insufficientCredit` | `CallRefusedException` | 충전을 안내합니다. 재전송해도 소용없습니다 |
+| `concurrentLimitExceeded` | `CallRefusedException` | 자기 통화가 하나 끝나기를 기다렸다가 재시도합니다 |
+| `callerNotVerified` | `CallRefusedException` | 번호 인증을 안내합니다. 재전송해도 소용없습니다 |
+| `noRepresentativeNumber` | `CallRefusedException` | 발신 번호 설정을 안내합니다. 재전송해도 소용없습니다 |
+| `callProviderUnauthorized` | `CallProviderException` | 서비스 장애로 보고합니다. 재전송은 도움이 안 됩니다 |
+| `callProviderDraining` | `CallProviderException` | 나중에 재시도합니다 |
+| `callProviderUnavailable` | `CallProviderException` | 나중에 재시도합니다 |
+| `callSetupFailed` | `CallProviderException` | 실패로 보고합니다 |
 
 명령 오류는 소켓을 닫지 않고 `EventType.ERROR` 구독자에게도 전달됩니다. 실패한
 `createCall`이 멈춘 채 남지 않도록 `waitClosed()`가 그 오류를 다시 던집니다.
@@ -120,3 +143,9 @@ WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으�
 ## 7. 버전 호환성
 
 `ai.tello:tello-sdk 0.1.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
+
+프레임 계약 전문은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에
+있고, [`docs/events/sdk-events.v1.schema.json`](docs/events/sdk-events.v1.schema.json)과
+[`docs/errors/errors.v1.json`](docs/errors/errors.v1.json)이 함께 있습니다. 이
+세 파일은 게이트웨이 구현 옆에 있는 정본에서 복사해 온 생성물입니다. 읽는 건
+여기서, 고치는 건 정본에서 합니다.
