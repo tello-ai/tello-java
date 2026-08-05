@@ -5,4 +5,8 @@ public class SessionReplacedException extends TelloException {
     public SessionReplacedException(String message) {
         super(message);
     }
+
+    public SessionReplacedException(String message, String code) {
+        super(message, code);
+    }
 }

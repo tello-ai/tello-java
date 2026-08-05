@@ -205,7 +205,10 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                         throw te;
                     }
                     if (cause instanceof TimeoutException) {
-                        throw new ConnectionClosedException("timed out waiting for auth.ok");
+                        // A missing auth.ok is an authentication failure, not a
+                        // transport one: the gateway closes with 4401 on its own
+                        // 10s deadline either way (docs/protocol/sdk-ws.v1.md §2).
+                        throw new AuthenticationException("timed out waiting for auth.ok");
                     }
                     throw new ConnectionClosedException("authentication failed");
                 });

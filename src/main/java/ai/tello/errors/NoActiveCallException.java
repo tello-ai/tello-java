@@ -5,4 +5,8 @@ public class NoActiveCallException extends TelloException {
     public NoActiveCallException(String message) {
         super(message);
     }
+
+    public NoActiveCallException(String message, String code) {
+        super(message, code);
+    }
 }

@@ -5,4 +5,8 @@ public class ValidationException extends TelloException {
     public ValidationException(String message) {
         super(message);
     }
+
+    public ValidationException(String message, String code) {
+        super(message, code);
+    }
 }

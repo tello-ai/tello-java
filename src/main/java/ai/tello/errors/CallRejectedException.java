@@ -7,7 +7,11 @@ public class CallRejectedException extends TelloException {
     public final String question;
 
     public CallRejectedException(String message, String question) {
-        super(message);
+        this(message, question, null);
+    }
+
+    public CallRejectedException(String message, String question, String code) {
+        super(message, code);
         this.question = question;
     }
 }

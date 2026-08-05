@@ -5,4 +5,8 @@ public class ConnectionClosedException extends TelloException {
     public ConnectionClosedException(String message) {
         super(message);
     }
+
+    public ConnectionClosedException(String message, String code) {
+        super(message, code);
+    }
 }

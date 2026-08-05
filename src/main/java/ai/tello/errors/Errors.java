@@ -11,18 +11,33 @@ public final class Errors {
         }
         switch (code) {
             case "unauthenticated":
-                return new AuthenticationException(message);
+                return new AuthenticationException(message, code);
             case "toRequired":
-                return new ValidationException(message);
+            case "callIdRequired":
+            case "dtmfDigitsRequired":
+            case "dtmfDigitsInvalid":
+            case "callNotFound":
+            case "callNotCompleted":
+                return new ValidationException(message, code);
             case "callAlreadyActive":
-                return new CallAlreadyActiveException(message);
+                return new CallAlreadyActiveException(message, code);
             case "noActiveCall":
-                return new NoActiveCallException(message);
+                return new NoActiveCallException(message, code);
             case "callRejected":
-                return new CallRejectedException(message, question);
+                return new CallRejectedException(message, question, code);
+            case "insufficientCredit":
+            case "concurrentLimitExceeded":
+            case "callerNotVerified":
+            case "noRepresentativeNumber":
+                return new CallRefusedException(message, code);
+            case "callProviderUnauthorized":
+            case "callProviderDraining":
+            case "callProviderUnavailable":
+            case "callSetupFailed":
+                return new CallProviderException(message, code);
             case "internalError":
             default:
-                return new TelloServerException(message);
+                return new TelloServerException(message, code);
         }
     }
 }

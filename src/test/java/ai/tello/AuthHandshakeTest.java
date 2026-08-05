@@ -109,7 +109,9 @@ class AuthHandshakeTest {
         try (FakeGateway server = FakeGateway.start()) {
             // Server never acknowledges the auth frame.
             ClientConfig config = new ClientConfig(API_KEY, server.url(), 300L);
-            TelloException ex = assertThrows(TelloException.class,
+            // A missing auth.ok is an authentication failure, not a transport
+            // one — the gateway closes with 4401 on its own deadline either way.
+            TelloException ex = assertThrows(AuthenticationException.class,
                     () -> new TelloClient(config).connectBlocking());
             assertKeyAbsent(ex);
         }
