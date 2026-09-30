@@ -20,6 +20,18 @@
 - Built-in `java.net.http.WebSocket` transport (auto pong); Gson for JSON.
 - `TELLO_API_KEY` / `TELLO_URL` environment-variable config.
 
+### Fixed (connect transport failures)
+
+- A transport failure in `connect()` (the socket cannot be opened, the upgrade is
+  refused, or the `auth` frame cannot be sent) now fails it with
+  `ConnectionClosedException`, with the underlying error as its cause. It used to
+  surface as the raw `java.net` / `java.io` exception, which `connectBlocking()`
+  threw wrapped in a `CompletionException`. Commands sent after such a failure
+  fail instead of waiting for an `auth.ok` that never comes.
+- The README said an `auth.ok` timeout fails `connect()` with
+  `ConnectionClosedException`; it fails with `AuthenticationException`, as it
+  always did.
+
 ### Fixed (call wait ends only on createCall errors)
 
 - `waitClosed()` no longer returns on an error from a command other than

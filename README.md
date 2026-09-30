@@ -35,8 +35,14 @@ or via `TELLO_API_KEY` / `TELLO_URL` environment variables (a no-arg
 `new TelloClient()` reads them).
 
 A rejected key (`unauthenticated` error frame or close 4401) or an `auth.ok` wait
-timeout makes `connect()` / `connectBlocking()` fail with an
-`AuthenticationException` (or `ConnectionClosedException` on timeout).
+timeout (the connect timeout, 10 s by default) makes `connect()` /
+`connectBlocking()` fail with an `AuthenticationException`. A transport failure
+makes it fail with a `ConnectionClosedException`: the socket cannot be opened
+(refused, unreachable, TLS or upgrade failure, connect timeout), the `auth` frame
+cannot be sent, or the connection closes before `auth.ok` for another reason.
+If opening the socket or sending the frame failed, `getCause()` returns the
+underlying error. `connectBlocking()` throws these exceptions directly;
+`connect()` completes exceptionally with them.
 
 ## 3. Connect + start a call
 

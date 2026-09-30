@@ -139,9 +139,13 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      *
      * <p>The returned future completes only after the server has acknowledged the
      * internal {@code auth} handshake with {@code auth.ok}. It completes
-     * exceptionally — with a {@link io.telloai.errors.TelloException} — if the key is
-     * rejected ({@code unauthenticated} error frame or close 4401) or {@code auth.ok}
-     * does not arrive within the configured connect timeout.
+     * exceptionally with an {@link AuthenticationException} if the key is rejected
+     * ({@code unauthenticated} error frame or close 4401) or {@code auth.ok} does not
+     * arrive within the configured connect timeout, and with a
+     * {@link ConnectionClosedException} on a transport failure: the socket cannot be
+     * opened, the {@code auth} frame cannot be sent, or the connection otherwise closes
+     * before {@code auth.ok}. A failure to open the socket or send the frame is its
+     * cause.
      */
     public CompletableFuture<TelloClient> connect() {
         synchronized (lock) {
@@ -164,7 +168,12 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                     this.ws = webSocket;
                     return authenticate(webSocket);
                 })
-                .thenApply(ignored -> this);
+                .handle((ignored, ex) -> {
+                    if (ex != null) {
+                        throw connectFailure(ex);
+                    }
+                    return this;
+                });
     }
 
     /** Blocking convenience: connect (including auth) and return {@code this}. */
@@ -206,8 +215,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                         return (Void) null;
                     }
                     abortQuietly();
-                    Throwable cause = ex instanceof CompletionException && ex.getCause() != null
-                            ? ex.getCause() : ex;
+                    Throwable cause = unwrap(ex);
                     if (cause instanceof TelloException te) {
                         throw te;
                     }
@@ -219,6 +227,26 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                     }
                     throw new ConnectionClosedException("authentication failed");
                 });
+    }
+
+    /**
+     * What {@code connect()} fails with: an SDK exception as it is (auth rejected or
+     * timed out, connection closed before {@code auth.ok}); any other failure, which
+     * only opening the socket or sending the {@code auth} frame can raise, as a
+     * {@link ConnectionClosedException} caused by it. Commands waiting for
+     * {@code auth.ok} fail with it too instead of waiting forever.
+     */
+    private TelloException connectFailure(Throwable ex) {
+        Throwable cause = unwrap(ex);
+        TelloException error;
+        if (cause instanceof TelloException te) {
+            error = te;
+        } else {
+            error = new ConnectionClosedException("connection failed: " + cause);
+            error.initCause(cause);
+        }
+        failAuth(error);
+        return error;
     }
 
     /** Close the connection and wait (bounded) for the receive loop to finish. */
@@ -502,6 +530,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     private static boolean isBlank(String s) {
         return s == null || s.isEmpty();
+    }
+
+    /** The failure inside a {@link CompletionException}, or {@code ex} itself. */
+    private static Throwable unwrap(Throwable ex) {
+        return ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
     }
 
     private final class Listener implements WebSocket.Listener {

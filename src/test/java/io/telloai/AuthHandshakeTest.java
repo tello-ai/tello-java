@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.telloai.errors.AuthenticationException;
+import io.telloai.errors.ConnectionClosedException;
 import io.telloai.errors.TelloException;
+import java.net.ServerSocket;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
@@ -17,9 +19,10 @@ import org.junit.jupiter.api.Test;
 /**
  * End-to-end coverage of the internal WebSocket auth handshake against a local
  * {@link FakeGateway}: the {@code auth} frame is first (raw key in {@code token}),
- * no key leaks onto the upgrade, business commands wait for {@code auth.ok}, and
- * every auth failure mode (error frame, close 4401, timeout) surfaces as a connect
- * failure.
+ * no key leaks onto the upgrade, business commands wait for {@code auth.ok}, every
+ * auth failure mode (error frame, close 4401, timeout) surfaces as an
+ * {@link AuthenticationException} connect failure, and a transport failure as a
+ * {@link ConnectionClosedException} one.
  */
 class AuthHandshakeTest {
 
@@ -115,6 +118,18 @@ class AuthHandshakeTest {
                     () -> new TelloClient(config).connectBlocking());
             assertKeyAbsent(ex);
         }
+    }
+
+    @Test
+    void transportFailureFailsConnectWithConnectionClosed() throws Exception {
+        int port;
+        try (ServerSocket probe = new ServerSocket(0)) {
+            port = probe.getLocalPort();
+        }
+        // Nothing listens on the port any more, so opening the socket is refused.
+        TelloException ex = assertThrows(ConnectionClosedException.class,
+                () -> new TelloClient(API_KEY, "ws://127.0.0.1:" + port + "/sdk").connectBlocking());
+        assertKeyAbsent(ex);
     }
 
     private static void sendQuietly(FakeGateway server, String text) {

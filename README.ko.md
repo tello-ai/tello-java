@@ -35,8 +35,14 @@ Java 17 이상이 필요합니다. 런타임 의존성은 Gson 하나뿐이고, 
 `new TelloClient()`가 이 값들을 읽습니다.
 
 키가 거부되거나(`unauthenticated` 오류 프레임 또는 4401 종료) `auth.ok` 대기가
-타임아웃되면 `connect()` / `connectBlocking()`이 `AuthenticationException`
-(타임아웃이면 `ConnectionClosedException`)으로 실패합니다.
+타임아웃되면(연결 타임아웃, 기본 10초) `connect()` / `connectBlocking()`이
+`AuthenticationException`으로 실패합니다. 전송 계층이 실패하면
+`ConnectionClosedException`으로 실패합니다. 소켓을 열지 못한 경우(연결 거부,
+도달 불가, TLS·업그레이드 실패, 연결 타임아웃), `auth` 프레임을 보내지 못한
+경우, `auth.ok` 전에 다른 이유로 연결이 닫힌 경우가 여기에 해당합니다.
+소켓을 열거나 프레임을 보내다 실패했다면 `getCause()`가 원래 오류를 돌려줍니다.
+`connectBlocking()`은 이 예외들을 그대로 던지고, `connect()`는 이 예외들로 예외
+완료됩니다.
 
 ## 3. 연결 + 통화 시작
 
