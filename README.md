@@ -13,12 +13,24 @@ is forwarded back into the call.
 > contract lives in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md).
 > Ported from `tello-python`; behaviour is 1:1 with the gateway.
 
-## 1. Install (Gradle)
+## 1. Install
+
+Gradle:
 
 ```kotlin
 dependencies {
     implementation("io.telloai:tello-sdk:0.1.1")
 }
+```
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>io.telloai</groupId>
+    <artifactId>tello-sdk</artifactId>
+    <version>0.1.1</version>
+</dependency>
 ```
 
 Requires Java 17+. The only runtime dependency is Gson; the WebSocket transport is

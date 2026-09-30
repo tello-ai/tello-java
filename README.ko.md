@@ -13,12 +13,24 @@ Java용 Tello SDK. turn-provider-gateway `/sdk` 엔드포인트에 붙는 얇은
 > 계약은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에 있습니다.
 > `tello-python`에서 이식했고, 게이트웨이 기준 동작이 1:1로 같습니다.
 
-## 1. 설치 (Gradle)
+## 1. 설치
+
+Gradle:
 
 ```kotlin
 dependencies {
     implementation("io.telloai:tello-sdk:0.1.1")
 }
+```
+
+Maven:
+
+```xml
+<dependency>
+    <groupId>io.telloai</groupId>
+    <artifactId>tello-sdk</artifactId>
+    <version>0.1.1</version>
+</dependency>
 ```
 
 Java 17 이상이 필요합니다. 런타임 의존성은 Gson 하나뿐이고, WebSocket 전송은
