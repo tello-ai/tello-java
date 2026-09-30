@@ -29,11 +29,10 @@ WebSocket 연결을 열기 전에 필수 환경 변수를 모두 검증합니다
 ## 컴파일 및 실행
 
 먼저 SDK를 빌드해 클래스와 Gson을 준비하고, 같은 classpath로 원하는 독립 예제를
-컴파일합니다. 지금 저장소에는 Gradle wrapper가 없으니 로컬에 설치된 Gradle을
-쓰세요.
+컴파일합니다.
 
 ```sh
-gradle classes
+./gradlew classes
 javac -cp "build/classes/java/main:/path/to/gson-2.11.0.jar" -d build/live-examples examples/CallSummary.java
 java -cp "build/live-examples:build/classes/java/main:/path/to/gson-2.11.0.jar" CallSummary
 ```

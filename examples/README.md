@@ -29,11 +29,10 @@ response to the command; it is not an idempotency key.
 ## Compile and run
 
 Build the SDK first so its classes and Gson are available, then compile the
-chosen standalone example with the same classpath. The repository currently has
-no Gradle wrapper, so use a local Gradle installation where available.
+chosen standalone example with the same classpath.
 
 ```sh
-gradle classes
+./gradlew classes
 javac -cp "build/classes/java/main:/path/to/gson-2.11.0.jar" -d build/live-examples examples/CallSummary.java
 java -cp "build/live-examples:build/classes/java/main:/path/to/gson-2.11.0.jar" CallSummary
 ```
