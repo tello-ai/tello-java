@@ -24,6 +24,16 @@ dependencies {
 
 tasks.test { useJUnitPlatform() }
 
+// Sources carry Korean text; never fall back to the platform default charset.
+tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+tasks.withType<Javadoc>().configureEach {
+    (options as StandardJavadocDocletOptions).apply {
+        encoding = "UTF-8"
+        docEncoding = "UTF-8"
+        charSet = "UTF-8"
+    }
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
