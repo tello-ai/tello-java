@@ -77,8 +77,8 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 
 `AUTH_OK`는 `connect()`가 내부에서 소비하며 밖으로 다시 emit 하지 않습니다.
 
-`waitClosed()`는 통화가 종료 상태(또는 cancelled 상태)에 이르거나 연결이 닫힐
-때까지 블로킹합니다.
+`waitClosed()`는 통화가 종료 상태(또는 cancelled 상태)에 이르거나, 그 통화의
+`createCall`이 실패하거나, 연결이 닫힐 때까지 블로킹합니다.
 
 ## 5. 오류 처리
 
@@ -120,9 +120,15 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 | `callProviderUnavailable` | `CallProviderException` | 나중에 재시도합니다 |
 | `callSetupFailed` | `CallProviderException` | 실패로 보고합니다 |
 
-명령 오류는 소켓을 닫지 않고 `EventType.ERROR` 구독자에게도 전달됩니다. 실패한
-`createCall`이 멈춘 채 남지 않도록 `waitClosed()`가 그 오류를 다시 던집니다.
-통화 도중 연결이 끊기면 `ConnectionClosedException`, 다른 연결에 세션을
+명령 오류는 소켓을 닫지 않고 `EventType.ERROR` 구독자에게 전달됩니다.
+`waitClosed()`를 끝내는 오류는 현재 통화의 `createCall`에 대한 오류뿐이며,
+`waitClosed()`가 그 오류를 다시 던집니다. `call.created` 전의 거부와 그 뒤에
+통화 자체가 실패한 경우가 여기에 해당합니다. 게이트웨이는 명령마다 `requestId`를
+오류에 그대로 돌려주므로 `createCall`은 항상 `requestId`를 싣습니다. 비어 있지
+않은 `requestId`를 넘기면 그 값을, 아니면 SDK가 만든 UUID를 씁니다. 그 밖의
+명령(`answer`, `sendDtmf`, `cancel`, `getSummary`) 오류는 `EventType.ERROR`
+이벤트로만 전달됩니다. 통화는 계속되고 `waitClosed()`도 계속 기다립니다. 통화
+도중 연결이 끊기면 `ConnectionClosedException`, 다른 연결에 세션을
 빼앗기면(4429 종료) `SessionReplacedException`입니다.
 
 WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으로 나갑니다.

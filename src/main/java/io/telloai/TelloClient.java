@@ -17,8 +17,10 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -55,8 +57,11 @@ import java.util.concurrent.TimeoutException;
  *       rejected key ({@code unauthenticated} error frame or close 4401) or an
  *       {@code auth.ok} wait timeout makes {@code connect()} fail; the API key is
  *       never placed in the URL, a header, a log line, or an exception message.</li>
- *   <li>The gateway keeps the socket open on command errors, so {@link #waitClosed()}
- *       resolves on a rejected {@code createCall} too, rather than hanging.</li>
+ *   <li>The gateway keeps the socket open on command errors, and a call ends without a
+ *       terminal event only when its {@code createCall} fails. So {@code createCall}
+ *       always carries a {@code requestId} (generated when omitted), and
+ *       {@link #waitClosed()} ends only on an error echoing it; an error from any other
+ *       command is only emitted to {@code error} handlers.</li>
  *   <li>WS-level ping heartbeat is answered with a pong automatically.</li>
  *   <li>There is no reconnect/resume protocol.</li>
  * </ul>
@@ -80,6 +85,8 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private boolean connectionClosed; // finish() has run
     private boolean finished; // run-once guard for finish()
     private TelloException callError; // call-level error to raise once from waitClosed()
+    /** requestIds of the createCall commands sent for the current call. */
+    private final Set<String> callRequestIds = new HashSet<>();
 
     /** Set from either the WS thread or a sender; read from many — kept volatile. */
     private volatile TelloException closeExc;
@@ -246,7 +253,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      * Block until the current call ends or the connection closes.
      *
      * <p>Throws the connection error (auth / session-replaced / abnormal mid-call
-     * disconnect) or a call-start rejection error if one occurred.
+     * disconnect), or the error that answered this call's {@code createCall}: a refusal
+     * before {@code call.created}, or a failure of the call after it. An error from any
+     * other command ({@code answer}, {@code sendDtmf}, {@code cancel}, {@code getSummary})
+     * does not end the call: it is only emitted to {@code error} handlers, and this keeps
+     * waiting.
      */
     public void waitClosed() {
         synchronized (lock) {
@@ -279,15 +290,28 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         return createCall(to, prompt, null, null);
     }
 
+    /**
+     * Start a call. The frame always carries a {@code requestId}: {@code requestId} when
+     * non-empty, otherwise a generated UUID. The gateway echoes it on the error that
+     * refuses or ends this call, which is how {@link #waitClosed()} tells that error
+     * apart from the errors of other commands.
+     */
     public CompletableFuture<Void> createCall(String to, String prompt,
                                               Map<String, ?> metadata, String requestId) {
+        String id = isBlank(requestId) ? UUID.randomUUID().toString() : requestId;
         synchronized (lock) {
+            if (!active) {
+                callRequestIds.clear();
+            }
+            // While a call is active the gateway refuses this createCall with
+            // callAlreadyActive and the call continues, so the id joins that call's ids.
+            callRequestIds.add(id);
             callGen++;
             callFinished = false;
             callError = null;
             active = true;
         }
-        return send(Commands.createCall(to, prompt, metadata, requestId));
+        return send(Commands.createCall(to, prompt, metadata, id));
     }
 
     public CompletableFuture<Void> answer(String text) {
@@ -386,9 +410,13 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                 if ("unauthenticated".equals(err.code)) {
                     closeExc = exc;
                     failAuth(exc);
-                } else if (!NON_ABORTING.contains(err.code) && active) {
-                    // The gateway sends no terminal frame for a rejected command, so
-                    // unblock waitClosed() with the mapped error instead of hanging.
+                } else if (active && callRequestIds.contains(err.requestId)
+                        && !NON_ABORTING.contains(err.code)) {
+                    // Only an error answering this call's createCall ends the call: a
+                    // refusal, or a failure after call.created. The gateway sends no
+                    // terminal frame for either, so unblock waitClosed() with it. Any
+                    // other command's error leaves the call running
+                    // (docs/protocol/sdk-ws.v1.md §6) and is only emitted below.
                     callError = exc;
                     active = false;
                     callFinished = true;

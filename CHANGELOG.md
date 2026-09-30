@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Fixed (call wait ends only on createCall errors)
+
+- `waitClosed()` no longer returns on an error from a command other than
+  `createCall`. It used to end on any error frame while a call was active (except
+  `noActiveCall` / `callAlreadyActive`), so a rejected `sendDtmf`
+  (`dtmfDigitsInvalid`), `answer`, `cancel`, or `getSummary` made it throw while
+  the call was still live, and a caller that then closed the client made the
+  gateway cancel the real call. A failed command does not end the call
+  (`docs/protocol/sdk-ws.v1.md` §6), so those errors are now delivered only as
+  `EventType.ERROR` events and `waitClosed()` keeps waiting for the terminal event
+  or the connection close.
+- `waitClosed()` still re-raises an error answering the current call's
+  `createCall`: a refusal before `call.created`, or a call failure after it, which
+  the gateway reports only as an error echoing that `createCall`'s `requestId`.
+- `createCall` now always sends a `requestId`: a non-empty caller-supplied value
+  unchanged, otherwise a generated UUID. Method signatures are unchanged.
+
 ### Changed (breaking — Maven group and Java package)
 
 - Maven coordinates are `io.telloai:tello-sdk` (was `ai.tello:tello-sdk`) and

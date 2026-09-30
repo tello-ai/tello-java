@@ -78,7 +78,7 @@ cast to the concrete type:
 `AUTH_OK` is consumed internally by `connect()` and never re-emitted.
 
 `waitClosed()` blocks until the call reaches a terminal state (or a cancelled
-status) or the connection closes.
+status), its `createCall` fails, or the connection closes.
 
 ## 5. Error handling
 
@@ -117,10 +117,16 @@ Every error carries the gateway code on `.code` — branch on that, never on
 | `callProviderUnavailable` | `CallProviderException` | retry later at your own pace |
 | `callSetupFailed` | `CallProviderException` | surface as a failure and report it |
 
-Command errors are also delivered to `EventType.ERROR` subscribers without closing
-the socket. `waitClosed()` re-raises the relevant error so a failed `createCall`
-does not hang. Connection drop mid-call → `ConnectionClosedException`; session
-displaced (close 4429) → `SessionReplacedException`.
+Command errors are delivered to `EventType.ERROR` subscribers without closing the
+socket. Only an error answering the current call's `createCall` ends
+`waitClosed()`, which re-raises it: a refusal before `call.created`, or a failure
+of the call after it. The gateway echoes each command's `requestId` on its error,
+so `createCall` always carries one: the `requestId` you pass if it is non-empty,
+otherwise a generated UUID. An error from any other command (`answer`,
+`sendDtmf`, `cancel`, `getSummary`) is delivered only as an `EventType.ERROR`
+event; the call keeps running and `waitClosed()` keeps waiting. Connection drop
+mid-call → `ConnectionClosedException`; session displaced (close 4429) →
+`SessionReplacedException`.
 
 The gateway drives a WS-level ping heartbeat; pongs are sent automatically. There
 is no reconnect/resume — treat an abnormal close as reconnect-worthy and restart
