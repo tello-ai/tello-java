@@ -11,7 +11,7 @@ package io.telloai;
  */
 public final class ClientConfig {
 
-    public static final String DEFAULT_URL = "ws://localhost:3000/sdk";
+    public static final String DEFAULT_URL = "wss://api.telloai.io/sdk";
     public static final String ENV_API_KEY = "TELLO_API_KEY";
     public static final String ENV_URL = "TELLO_URL";
 

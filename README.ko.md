@@ -32,7 +32,8 @@ Java 17 이상이 필요합니다. 런타임 의존성은 Gson 하나뿐이고, 
 (`Authorization` 헤더도, `?token=` query도 없음) URL·로그·예외 메시지에 남지
 않습니다. 전부 내부 처리라 직접 호출할 일은 없습니다. 키는 인자로 직접 넘기거나
 `TELLO_API_KEY` / `TELLO_URL` 환경 변수로 지정하면 됩니다. 인자 없는
-`new TelloClient()`가 이 값들을 읽습니다.
+`new TelloClient()`가 이 값들을 읽습니다. URL을 인자로도 `TELLO_URL`로도 주지
+않으면 `wss://api.telloai.io/sdk`에 연결합니다.
 
 키가 거부되거나(`unauthenticated` 오류 프레임 또는 4401 종료) `auth.ok` 대기가
 타임아웃되면(연결 타임아웃, 기본 10초) `connect()` / `connectBlocking()`이
@@ -47,7 +48,7 @@ Java 17 이상이 필요합니다. 런타임 의존성은 Gson 하나뿐이고, 
 ## 3. 연결 + 통화 시작
 
 ```java
-try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000/sdk").connectBlocking()) {
+try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.io/sdk").connectBlocking()) {
     client.on(EventType.USER_TURN, e -> {
         TurnEvent turn = (TurnEvent) e;
         client.answer("확인했습니다. 계속 말씀해주세요.");

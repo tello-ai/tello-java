@@ -32,7 +32,8 @@ once the server returns `auth.ok`. The key is never placed on the WS upgrade req
 `Authorization` header, no `?token=` query), so it stays out of URLs, logs, and
 exception messages. This is internal — you do not call it. Pass the key explicitly
 or via `TELLO_API_KEY` / `TELLO_URL` environment variables (a no-arg
-`new TelloClient()` reads them).
+`new TelloClient()` reads them). Without a URL argument or `TELLO_URL`, the client
+connects to `wss://api.telloai.io/sdk`.
 
 A rejected key (`unauthenticated` error frame or close 4401) or an `auth.ok` wait
 timeout (the connect timeout, 10 s by default) makes `connect()` /
@@ -47,7 +48,7 @@ underlying error. `connectBlocking()` throws these exceptions directly;
 ## 3. Connect + start a call
 
 ```java
-try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000/sdk").connectBlocking()) {
+try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.io/sdk").connectBlocking()) {
     client.on(EventType.USER_TURN, e -> {
         TurnEvent turn = (TurnEvent) e;
         client.answer("확인했습니다. 계속 말씀해주세요.");

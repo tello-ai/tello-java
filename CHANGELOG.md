@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.1 (2026-09-30)
+
+### Fixed (production gateway by default)
+
+- **Behavior change**: with no URL argument and no `TELLO_URL`, a client
+  (`new TelloClient()`, `new TelloClient(apiKey)`) now connects to the production
+  gateway `wss://api.telloai.io/sdk`, the new `ClientConfig.DEFAULT_URL`. The
+  default was `ws://localhost:3000/sdk`, a local development gateway, so a client
+  built without a URL could not reach Tello. To use another gateway, pass its URL
+  or set `TELLO_URL`; an explicit URL still wins over `TELLO_URL`.
+- The README and `TelloClient` javadoc examples connected to
+  `ws://localhost:3000/sdk`; they now connect to `wss://api.telloai.io/sdk`, and
+  the README states the default.
+
 ## 0.1.0 (2026-09-30)
 
 - Initial WS realtime client for turn-provider-gateway `/sdk`, ported from

@@ -26,6 +26,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /**
  * Tello WebSocket realtime client.
@@ -35,7 +36,7 @@ import java.util.concurrent.TimeoutException;
  * dispatches inbound turn/status/terminal/error events to pub/sub handlers.
  *
  * <pre>{@code
- * try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000/sdk").connectBlocking()) {
+ * try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.io/sdk").connectBlocking()) {
  *     client.on(EventType.USER_TURN, e -> client.answer("확인했습니다."));
  *     client.createCall("+821012345678", "예약 확인").join();
  *     client.waitClosed();
@@ -120,20 +121,24 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     }
 
     public TelloClient(String apiKey, String url) {
-        this(resolve(apiKey, url));
+        this(resolve(apiKey, url, System::getenv));
     }
 
     public TelloClient(ClientConfig config) {
         this.config = config;
     }
 
-    private static ClientConfig resolve(String apiKey, String url) {
-        String key = apiKey != null ? apiKey : System.getenv(ClientConfig.ENV_API_KEY);
+    /**
+     * An argument wins over its environment variable, looked up through {@code env};
+     * a URL found in neither falls back to {@link ClientConfig#DEFAULT_URL}.
+     */
+    static ClientConfig resolve(String apiKey, String url, Function<String, String> env) {
+        String key = apiKey != null ? apiKey : env.apply(ClientConfig.ENV_API_KEY);
         if (key == null || key.isEmpty()) {
             throw new IllegalArgumentException(
                     "api_key is required (pass apiKey or set $" + ClientConfig.ENV_API_KEY + ")");
         }
-        String resolvedUrl = url != null ? url : System.getenv(ClientConfig.ENV_URL);
+        String resolvedUrl = url != null ? url : env.apply(ClientConfig.ENV_URL);
         if (resolvedUrl == null || resolvedUrl.isEmpty()) {
             resolvedUrl = ClientConfig.DEFAULT_URL;
         }
