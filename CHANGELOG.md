@@ -20,6 +20,29 @@
 - Built-in `java.net.http.WebSocket` transport (auto pong); Gson for JSON.
 - `TELLO_API_KEY` / `TELLO_URL` environment-variable config.
 
+### Fixed (each call wait ends with its own call)
+
+- **Behavior change**: a `waitClosed()` in progress now returns when the call it
+  began in ends, with that call's outcome, even if a terminal-event handler starts
+  a follow-up call. It used to carry on into the follow-up call and return only
+  when that one ended. Call `waitClosed()` again to wait for the follow-up. A call
+  now ends before the event that ends it (terminal event, ending error, or
+  `DISCONNECTED`) reaches any handler, so a `createCall` from a handler opens a new
+  call, and a late error echoing the previous call's `createCall` no longer ends
+  the new one.
+- A `callAlreadyActive` answering the `createCall` that opened a call now ends
+  `waitClosed()` with `CallAlreadyActiveException`; the wait used to hang. The
+  gateway holds its previous call for a short cleanup window after the terminal
+  event (`docs/protocol/sdk-ws.v1.md` §4.1), so a `createCall` sent in that window
+  never starts a call and gets no `call.created`. Send the `createCall` again
+  shortly. A `callAlreadyActive` for a `createCall` sent during a live call is
+  still only emitted, and `noActiveCall` still never ends the wait.
+- A `createCall` that cannot be sent (for example after the connection closed)
+  now ends the call it opened with the send error: its future fails, the client is
+  not left with a call in progress, and `waitClosed()` returns instead of hanging.
+  Commands sent after the connection closed fail at once with
+  `ConnectionClosedException`.
+
 ### Fixed (connect transport failures)
 
 - A transport failure in `connect()` (the socket cannot be opened, the upgrade is

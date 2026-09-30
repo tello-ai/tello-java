@@ -60,8 +60,13 @@ import java.util.concurrent.TimeoutException;
  *   <li>The gateway keeps the socket open on command errors, and a call ends without a
  *       terminal event only when its {@code createCall} fails. So {@code createCall}
  *       always carries a {@code requestId} (generated when omitted), and
- *       {@link #waitClosed()} ends only on an error echoing it; an error from any other
- *       command is only emitted to {@code error} handlers.</li>
+ *       {@link #waitClosed()} ends on an error echoing one of the call's
+ *       {@code createCall}s, except {@code noActiveCall} and a {@code callAlreadyActive}
+ *       for a {@code createCall} sent during the call; an error from any other command
+ *       is only emitted to {@code error} handlers.</li>
+ *   <li>A call ends before the event that ends it reaches any handler, so a handler
+ *       that starts a follow-up call opens a new call, and a {@link #waitClosed()}
+ *       already in progress returns with the call it began in.</li>
  *   <li>WS-level ping heartbeat is answered with a pong automatically.</li>
  *   <li>There is no reconnect/resume protocol.</li>
  * </ul>
@@ -72,21 +77,24 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private static final int CLOSE_UNAUTHENTICATED = 4401;
     private static final int CLOSE_SESSION_REPLACED = 4429;
     private static final long CLOSE_WAIT_MILLIS = 5_000L;
-    private static final Set<String> NON_ABORTING = Set.of("noActiveCall", "callAlreadyActive");
 
     private final ClientConfig config;
     private final HttpClient http = HttpClient.newHttpClient();
 
     /** Guards all call state below and backs {@link #waitClosed()}'s wait/notify. */
     private final Object lock = new Object();
-    private boolean active;
-    private int callGen;
-    private boolean callFinished; // current call reached terminal OR connection closed
-    private boolean connectionClosed; // finish() has run
-    private boolean finished; // run-once guard for finish()
-    private TelloException callError; // call-level error to raise once from waitClosed()
+    private boolean active; // a call is in progress
+    /**
+     * The call in progress, else the last call that ended, else (before any call has
+     * ended on this connection) the next call to open.
+     */
+    private Call call = new Call();
     /** requestIds of the createCall commands sent for the current call. */
     private final Set<String> callRequestIds = new HashSet<>();
+    /** requestId of the createCall that opened the current call. */
+    private String openingRequestId;
+    private boolean connectionClosed; // finish() has run
+    private boolean finished; // run-once guard for finish()
 
     /** Set from either the WS thread or a sender; read from many — kept volatile. */
     private volatile TelloException closeExc;
@@ -149,12 +157,16 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      */
     public CompletableFuture<TelloClient> connect() {
         synchronized (lock) {
+            // A new connection starts with no call in progress, and no call state of a
+            // previous connection carries over into it.
             active = false;
-            callGen = 0;
-            callFinished = false;
+            callRequestIds.clear();
+            openingRequestId = null;
+            if (call.ended) {
+                call = new Call();
+            }
             connectionClosed = false;
             finished = false;
-            callError = null;
         }
         closeExc = null;
         authFuture = new CompletableFuture<>();
@@ -278,18 +290,39 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     }
 
     /**
-     * Block until the current call ends or the connection closes.
+     * Block until the current call ends, and return with its outcome.
      *
      * <p>Throws the connection error (auth / session-replaced / abnormal mid-call
-     * disconnect), or the error that answered this call's {@code createCall}: a refusal
-     * before {@code call.created}, or a failure of the call after it. An error from any
-     * other command ({@code answer}, {@code sendDtmf}, {@code cancel}, {@code getSummary})
-     * does not end the call: it is only emitted to {@code error} handlers, and this keeps
-     * waiting.
+     * disconnect), or the error that answered one of this call's {@code createCall}s: a
+     * refusal before {@code call.created}, a failure of the call after it, or a
+     * {@code callAlreadyActive} for the {@code createCall} that opened the call (the
+     * gateway was still finishing its previous call, so this one never started; retry
+     * shortly). An error from any other command ({@code answer}, {@code sendDtmf},
+     * {@code cancel}, {@code getSummary}), {@code noActiveCall}, and a
+     * {@code callAlreadyActive} for a {@code createCall} sent during the call do not end
+     * the call: they are only emitted to {@code error} handlers, and this keeps waiting.
+     *
+     * <p>A wait that begins during a call returns when that call ends, even if a handler
+     * has started a follow-up call by then; call this again to wait for the follow-up.
+     * With no call in progress, this returns at once with the outcome of the call that
+     * ended last (throwing its error only once), or, before any call has ended on this
+     * connection, waits for the next call to end or the connection to close.
      */
     public void waitClosed() {
         synchronized (lock) {
-            while (!callFinished) {
+            Call target = call;
+            if (!active && target.ended) {
+                if (closeExc != null) {
+                    throw closeExc;
+                }
+                if (target.error != null && !target.errorThrown) {
+                    target.errorThrown = true;
+                    throw target.error;
+                }
+                return;
+            }
+            // A follow-up call opened meanwhile is another Call, so it cannot extend this.
+            while (!target.ended) {
                 try {
                     lock.wait();
                 } catch (InterruptedException e) {
@@ -297,13 +330,9 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                     return;
                 }
             }
-            if (closeExc != null) {
-                throw closeExc;
-            }
-            if (callError != null) {
-                TelloException error = callError;
-                callError = null;
-                throw error;
+            if (target.error != null) {
+                target.errorThrown = true;
+                throw target.error;
             }
         }
     }
@@ -323,23 +352,33 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
      * non-empty, otherwise a generated UUID. The gateway echoes it on the error that
      * refuses or ends this call, which is how {@link #waitClosed()} tells that error
      * apart from the errors of other commands.
+     *
+     * <p>With no call in progress this opens a new call. During a call it opens none:
+     * the gateway refuses it with {@code callAlreadyActive} and the call goes on. If the
+     * frame cannot be sent, the returned future fails and the call this opened ends with
+     * that error.
      */
     public CompletableFuture<Void> createCall(String to, String prompt,
                                               Map<String, ?> metadata, String requestId) {
         String id = isBlank(requestId) ? UUID.randomUUID().toString() : requestId;
+        Call opened;
         synchronized (lock) {
-            if (!active) {
-                callRequestIds.clear();
+            if (active) {
+                callRequestIds.add(id);
+                opened = null;
+            } else {
+                opened = openCall(id);
             }
-            // While a call is active the gateway refuses this createCall with
-            // callAlreadyActive and the call continues, so the id joins that call's ids.
-            callRequestIds.add(id);
-            callGen++;
-            callFinished = false;
-            callError = null;
-            active = true;
         }
-        return send(Commands.createCall(to, prompt, metadata, id));
+        CompletableFuture<Void> sent = send(Commands.createCall(to, prompt, metadata, id));
+        if (opened == null) {
+            return sent;
+        }
+        return sent.whenComplete((ignored, ex) -> {
+            if (ex != null) {
+                failOpenedCall(opened, ex);
+            }
+        });
     }
 
     public CompletableFuture<Void> answer(String text) {
@@ -372,8 +411,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
     private CompletableFuture<Void> send(String frame) {
         WebSocket webSocket = ws;
-        if (webSocket == null) {
-            return failed(connectionError());
+        synchronized (lock) {
+            // Never connected, or this connection has closed: nothing can be sent.
+            if (webSocket == null || finished) {
+                return failed(connectionError());
+            }
         }
         // Withhold every business command until auth.ok. If auth failed, this gate
         // is already completed exceptionally and the send fails without touching the wire.
@@ -432,43 +474,79 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
             return;
         }
 
+        // A call ends before the event that ends it reaches a handler, so a handler
+        // that starts a follow-up call opens a new one.
         if (event instanceof ErrorEvent err) {
             TelloException exc = Errors.exceptionFor(err.code, err.message, err.question);
             synchronized (lock) {
                 if ("unauthenticated".equals(err.code)) {
                     closeExc = exc;
                     failAuth(exc);
-                } else if (active && callRequestIds.contains(err.requestId)
-                        && !NON_ABORTING.contains(err.code)) {
-                    // Only an error answering this call's createCall ends the call: a
-                    // refusal, or a failure after call.created. The gateway sends no
-                    // terminal frame for either, so unblock waitClosed() with it. Any
-                    // other command's error leaves the call running
-                    // (docs/protocol/sdk-ws.v1.md §6) and is only emitted below.
-                    callError = exc;
-                    active = false;
-                    callFinished = true;
-                    lock.notifyAll();
+                } else if (endsCall(err)) {
+                    // The gateway sends no terminal frame for this call, only this error.
+                    endCall(exc);
                 }
             }
             emit(EventType.ERROR, err);
             return;
         }
 
-        // Snapshot the call generation: if a terminal handler starts a follow-up
-        // call, callGen advances and we must not finish the wrong call.
-        int gen;
-        synchronized (lock) {
-            gen = callGen;
-        }
-        emit(event.type(), event);
         if (EventParser.isTerminal(event)) {
             synchronized (lock) {
-                if (callGen == gen) {
-                    active = false;
-                    callFinished = true;
-                    lock.notifyAll();
+                if (active) {
+                    endCall(null);
                 }
+            }
+        }
+        emit(event.type(), event);
+    }
+
+    /**
+     * Whether {@code err} ends the current call; the caller holds {@code lock}. Only an
+     * error answering one of the call's {@code createCall}s does: a refusal, or a
+     * failure of the call after {@code call.created}. Any other command's error leaves
+     * the call running (docs/protocol/sdk-ws.v1.md §6) and is only emitted.
+     */
+    private boolean endsCall(ErrorEvent err) {
+        if (!active || !callRequestIds.contains(err.requestId) || "noActiveCall".equals(err.code)) {
+            return false;
+        }
+        // callAlreadyActive for the createCall that opened the call: the gateway still
+        // holds its previous call (§4.1), so this one never started. For a createCall
+        // sent during the call, only that createCall was refused and the call goes on.
+        return !"callAlreadyActive".equals(err.code) || err.requestId.equals(openingRequestId);
+    }
+
+    /** Open a call for the createCall {@code id}; the caller holds {@code lock}. */
+    private Call openCall(String id) {
+        if (call.ended) {
+            call = new Call();
+        }
+        callRequestIds.clear();
+        callRequestIds.add(id);
+        openingRequestId = id;
+        active = true;
+        return call;
+    }
+
+    /**
+     * End the current call with {@code error} ({@code null} when it ended normally) and
+     * wake every wait on it; the caller holds {@code lock}.
+     */
+    private void endCall(TelloException error) {
+        active = false;
+        call.ended = true;
+        call.error = error;
+        lock.notifyAll();
+    }
+
+    /** End {@code opened} with its createCall's send failure, unless it ended already. */
+    private void failOpenedCall(Call opened, Throwable ex) {
+        Throwable cause = unwrap(ex);
+        TelloException error = cause instanceof TelloException te ? te : connectionError();
+        synchronized (lock) {
+            if (active && call == opened) {
+                endCall(error);
             }
         }
     }
@@ -491,8 +569,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                 return;
             }
             finished = true;
-            if (active && closeExc == null && callError == null) {
-                closeExc = new ConnectionClosedException("connection closed before call terminated");
+            if (active) {
+                if (closeExc == null) {
+                    closeExc = new ConnectionClosedException("connection closed before call terminated");
+                }
+                endCall(closeExc);
             }
         }
         // A close/error before auth.ok is a connect failure, not a hung future.
@@ -500,7 +581,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
                 : new ConnectionClosedException("connection closed before authentication"));
         emit(EventType.DISCONNECTED, new Event(EventType.DISCONNECTED, "", "", "", "", new JsonObject()));
         synchronized (lock) {
-            callFinished = true;
+            // Nothing ended the current call on this connection: release a wait begun
+            // before any call, or end a call opened while the connection was closing.
+            if (!call.ended) {
+                endCall(active ? connectionError() : closeExc);
+            }
             connectionClosed = true;
             lock.notifyAll();
         }
@@ -535,6 +620,18 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     /** The failure inside a {@link CompletionException}, or {@code ex} itself. */
     private static Throwable unwrap(Throwable ex) {
         return ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+    }
+
+    /**
+     * One call's outcome. A wait holds the {@code Call} it began in, so it returns with
+     * that call's outcome even when a follow-up call has opened by the time it wakes.
+     */
+    private static final class Call {
+        boolean ended;
+        /** The error the call ended with; {@code null} when it ended normally. */
+        TelloException error;
+        /** Whether a {@code waitClosed()} has thrown {@code error} already. */
+        boolean errorThrown;
     }
 
     private final class Listener implements WebSocket.Listener {
@@ -586,8 +683,10 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
-            if (closeExc == null && active) {
-                closeExc = new ConnectionClosedException("connection error: " + error);
+            synchronized (lock) {
+                if (closeExc == null && active) {
+                    closeExc = new ConnectionClosedException("connection error: " + error);
+                }
             }
             finish();
         }

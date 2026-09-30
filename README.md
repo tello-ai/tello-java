@@ -83,8 +83,14 @@ cast to the concrete type:
 
 `AUTH_OK` is consumed internally by `connect()` and never re-emitted.
 
-`waitClosed()` blocks until the call reaches a terminal state (or a cancelled
-status), its `createCall` fails, or the connection closes.
+`waitClosed()` blocks until the current call ends: a terminal event
+(`call.completed`, `call.noAnswer`, `call.failed`, or `call.statusChanged` with
+status `cancelled`), an error that ends the call (see §5), or the connection
+closing. A wait in progress returns when its own call ends, even if a handler
+starts a follow-up call from the terminal event; call `waitClosed()` again to
+wait for the follow-up. After `cancel()`, the gateway sends `call.statusChanged`
+with status `cancelled` as the call's terminal event, with `previousStatus` set
+to the status the call had before it.
 
 ## 5. Error handling
 
@@ -124,15 +130,42 @@ Every error carries the gateway code on `.code` — branch on that, never on
 | `callSetupFailed` | `CallProviderException` | surface as a failure and report it |
 
 Command errors are delivered to `EventType.ERROR` subscribers without closing the
-socket. Only an error answering the current call's `createCall` ends
+socket. Only an error answering one of the current call's `createCall`s ends
 `waitClosed()`, which re-raises it: a refusal before `call.created`, or a failure
 of the call after it. The gateway echoes each command's `requestId` on its error,
 so `createCall` always carries one: the `requestId` you pass if it is non-empty,
-otherwise a generated UUID. An error from any other command (`answer`,
-`sendDtmf`, `cancel`, `getSummary`) is delivered only as an `EventType.ERROR`
-event; the call keeps running and `waitClosed()` keeps waiting. Connection drop
-mid-call → `ConnectionClosedException`; session displaced (close 4429) →
+otherwise a generated UUID. Give every command its own `requestId`, and never
+reuse the `createCall`'s on another command: an error echoing it ends the wait.
+
+Two codes are special:
+
+- `callAlreadyActive` ends the wait only when it answers the `createCall` that
+  opened the call. The gateway is then still finishing the previous call (it
+  holds it briefly after the terminal event), so this call never started; send
+  the `createCall` again shortly. A `callAlreadyActive` for a `createCall` sent
+  during a live call is only an `EventType.ERROR` event, and the live call goes
+  on.
+- `noActiveCall` never ends the wait.
+
+An error from any other command (`answer`, `sendDtmf`, `cancel`, `getSummary`)
+is delivered only as an `EventType.ERROR` event; the call keeps running and
+`waitClosed()` keeps waiting. Connection drop mid-call →
+`ConnectionClosedException`; session displaced (close 4429) →
 `SessionReplacedException`.
+
+An `ErrorEvent` carries the raw `code`, `message`, and `question`. To handle it as
+the typed exception `waitClosed()` would throw, map it with
+`Errors.exceptionFor(code, message, question)` from `io.telloai.errors`:
+
+```java
+client.on(EventType.ERROR, e -> {
+    ErrorEvent err = (ErrorEvent) e;
+    TelloException error = Errors.exceptionFor(err.code, err.message, err.question);
+    if (error instanceof ValidationException) {
+        // e.g. dtmfDigitsInvalid for a sendDtmf: fix the input; the call goes on
+    }
+});
+```
 
 The gateway drives a WS-level ping heartbeat; pongs are sent automatically. There
 is no reconnect/resume — treat an abnormal close as reconnect-worthy and restart

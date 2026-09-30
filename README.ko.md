@@ -83,8 +83,14 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 
 `AUTH_OK`는 `connect()`가 내부에서 소비하며 밖으로 다시 emit 하지 않습니다.
 
-`waitClosed()`는 통화가 종료 상태(또는 cancelled 상태)에 이르거나, 그 통화의
-`createCall`이 실패하거나, 연결이 닫힐 때까지 블로킹합니다.
+`waitClosed()`는 현재 통화가 끝날 때까지 블로킹합니다. 종단 이벤트
+(`call.completed`, `call.noAnswer`, `call.failed`, 또는 status가 `cancelled`인
+`call.statusChanged`), 통화를 끝내는 오류(§5 참고), 연결 종료 중 하나가 오면
+끝납니다. 이미 기다리고 있던 `waitClosed()`는 핸들러가 종단 이벤트에서 후속
+통화를 시작해도 자기 통화가 끝나면 반환합니다. 후속 통화를 기다리려면
+`waitClosed()`를 다시 호출하세요. `cancel()` 뒤에는 게이트웨이가 status가
+`cancelled`인 `call.statusChanged`를 그 통화의 종단 이벤트로 보내고,
+`previousStatus`에는 취소 직전 상태가 담깁니다.
 
 ## 5. 오류 처리
 
@@ -127,15 +133,41 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "ws://localhost:3000
 | `callSetupFailed` | `CallProviderException` | 실패로 보고합니다 |
 
 명령 오류는 소켓을 닫지 않고 `EventType.ERROR` 구독자에게 전달됩니다.
-`waitClosed()`를 끝내는 오류는 현재 통화의 `createCall`에 대한 오류뿐이며,
+`waitClosed()`를 끝내는 오류는 현재 통화의 `createCall`들에 대한 오류뿐이며,
 `waitClosed()`가 그 오류를 다시 던집니다. `call.created` 전의 거부와 그 뒤에
 통화 자체가 실패한 경우가 여기에 해당합니다. 게이트웨이는 명령마다 `requestId`를
 오류에 그대로 돌려주므로 `createCall`은 항상 `requestId`를 싣습니다. 비어 있지
-않은 `requestId`를 넘기면 그 값을, 아니면 SDK가 만든 UUID를 씁니다. 그 밖의
-명령(`answer`, `sendDtmf`, `cancel`, `getSummary`) 오류는 `EventType.ERROR`
-이벤트로만 전달됩니다. 통화는 계속되고 `waitClosed()`도 계속 기다립니다. 통화
-도중 연결이 끊기면 `ConnectionClosedException`, 다른 연결에 세션을
-빼앗기면(4429 종료) `SessionReplacedException`입니다.
+않은 `requestId`를 넘기면 그 값을, 아니면 SDK가 만든 UUID를 씁니다. 명령마다
+`requestId`를 따로 쓰고, `createCall`의 `requestId`를 다른 명령에 다시 쓰지
+마세요. 그 값을 에코한 오류는 대기를 끝냅니다.
+
+두 코드는 따로 다룹니다:
+
+- `callAlreadyActive`는 통화를 연 `createCall`에 대한 응답일 때만 대기를
+  끝냅니다. 이때 게이트웨이는 직전 통화를 아직 정리하는 중이라(종단 이벤트 뒤에도
+  잠시 붙잡고 있음) 이 통화는 시작되지 않았습니다. 잠시 뒤 `createCall`을 다시
+  보내세요. 통화 도중 보낸 `createCall`에 대한 `callAlreadyActive`는
+  `EventType.ERROR` 이벤트로만 전달되고, 진행 중인 통화는 계속됩니다.
+- `noActiveCall`은 대기를 끝내지 않습니다.
+
+그 밖의 명령(`answer`, `sendDtmf`, `cancel`, `getSummary`) 오류는
+`EventType.ERROR` 이벤트로만 전달됩니다. 통화는 계속되고 `waitClosed()`도 계속
+기다립니다. 통화 도중 연결이 끊기면 `ConnectionClosedException`, 다른 연결에
+세션을 빼앗기면(4429 종료) `SessionReplacedException`입니다.
+
+`ErrorEvent`에는 원래의 `code`, `message`, `question`이 담겨 있습니다.
+`waitClosed()`가 던지는 것과 같은 타입의 예외로 다루려면 `io.telloai.errors`의
+`Errors.exceptionFor(code, message, question)`으로 바꾸세요:
+
+```java
+client.on(EventType.ERROR, e -> {
+    ErrorEvent err = (ErrorEvent) e;
+    TelloException error = Errors.exceptionFor(err.code, err.message, err.question);
+    if (error instanceof ValidationException) {
+        // 예: sendDtmf의 dtmfDigitsInvalid. 입력을 고치면 되고 통화는 계속됩니다
+    }
+});
+```
 
 WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으로 나갑니다.
 재연결이나 세션 재개 프로토콜은 없습니다. 비정상 종료가 나면 재연결이 필요한

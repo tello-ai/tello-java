@@ -20,8 +20,9 @@ import java.util.function.Consumer;
  * headers, queues every inbound text frame, and lets a test drive replies either
  * manually or via an {@link #onText(Consumer)} auto-responder.
  *
- * <p>Intentionally tiny: single connection, text frames only, no fragmentation,
- * payloads well under 64 KiB. It is a test double, not a production server.
+ * <p>Intentionally tiny: one connection at a time (the next is accepted once the
+ * current one ends), text frames only, no fragmentation, payloads well under
+ * 64 KiB. It is a test double, not a production server.
  */
 final class FakeGateway implements AutoCloseable {
 
@@ -78,6 +79,14 @@ final class FakeGateway implements AutoCloseable {
         return received.poll(millis, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * Drop the current connection without a close frame, as a network failure
+     * would. The fake then accepts the client's next connection.
+     */
+    void dropConnection() throws IOException {
+        socket.close();
+    }
+
     synchronized void sendText(String text) throws IOException {
         byte[] payload = text.getBytes(StandardCharsets.UTF_8);
         OutputStream o = out;
@@ -111,14 +120,17 @@ final class FakeGateway implements AutoCloseable {
     }
 
     private void run() {
-        try {
-            socket = serverSocket.accept();
-            InputStream in = socket.getInputStream();
-            out = socket.getOutputStream();
-            handshake(in, out);
-            readLoop(in);
-        } catch (IOException ignored) {
-            // socket closed / test finished
+        while (!serverSocket.isClosed()) {
+            try {
+                Socket s = serverSocket.accept();
+                socket = s;
+                InputStream in = s.getInputStream();
+                out = s.getOutputStream();
+                handshake(in, out);
+                readLoop(in);
+            } catch (IOException ignored) {
+                // connection dropped / test finished; accept the next one unless closed
+            }
         }
     }
 
