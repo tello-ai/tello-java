@@ -1,0 +1,45 @@
+# Publishes io.telloai:tello-sdk to Maven Central when a v<version> tag is pushed.
+#
+# Needs the io.telloai namespace verified on central.sonatype.com and these
+# repository secrets:
+#   MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD  a Central Portal user token
+#   SIGNING_KEY       ASCII-armored GPG secret key (gpg --armor --export-secret-keys <id>)
+#   SIGNING_PASSWORD  the passphrase of that key
+name: Publish Maven Central
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Check the tag matches the project version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PROJECT_VERSION="$(./gradlew -q properties --property version | sed -n 's/^version: //p')"
+          if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match project version ${PROJECT_VERSION}"
+            exit 1
+          fi
+      - run: ./gradlew test javadoc
+      # Signs every publication, uploads them through the Central Portal, and waits
+      # until the release is published.
+      - run: ./gradlew publishAndReleaseToMavenCentral
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}

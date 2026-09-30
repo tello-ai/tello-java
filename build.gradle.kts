@@ -1,6 +1,11 @@
+import com.vanniktech.maven.publish.JavaLibrary
+import com.vanniktech.maven.publish.JavadocJar
+
 plugins {
     `java-library`
-    `maven-publish`
+    signing
+    // 0.36.0 and later require Gradle 9; the wrapper is on Gradle 8.14.
+    id("com.vanniktech.maven.publish") version "0.35.0"
 }
 
 group = "io.telloai"
@@ -8,8 +13,6 @@ version = "0.1.0"
 
 java {
     toolchain { languageVersion.set(JavaLanguageVersion.of(17)) }
-    withSourcesJar()
-    withJavadocJar()
 }
 
 base { archivesName.set("tello-sdk") }
@@ -34,19 +37,45 @@ tasks.withType<Javadoc>().configureEach {
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            artifactId = "tello-sdk"
-            pom {
-                licenses {
-                    license {
-                        name.set("Apache License, Version 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                    }
-                }
+mavenPublishing {
+    configure(JavaLibrary(javadocJar = JavadocJar.Javadoc(), sourcesJar = true))
+    coordinates(group.toString(), "tello-sdk", version.toString())
+    // Through the Central Portal. The publish workflow runs publishAndReleaseToMavenCentral.
+    publishToMavenCentral()
+    signAllPublications()
+    pom {
+        name.set("Tello SDK for Java")
+        description.set(
+            "A thin WebSocket realtime client for the Tello turn-provider-gateway: place phone " +
+                "calls and answer each caller turn from your own code."
+        )
+        url.set("https://github.com/tello-ai/tello-java")
+        licenses {
+            license {
+                name.set("Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("repo")
             }
         }
+        developers {
+            developer {
+                id.set("tello-ai")
+                name.set("Tello")
+                email.set("tello@telloai.io")
+                url.set("https://telloai.io")
+            }
+        }
+        scm {
+            connection.set("scm:git:git://github.com/tello-ai/tello-java.git")
+            developerConnection.set("scm:git:ssh://git@github.com/tello-ai/tello-java.git")
+            url.set("https://github.com/tello-ai/tello-java")
+        }
     }
+}
+
+// Maven Central only takes signed artifacts, and the publish workflow always passes
+// the key. Require signing only when a key is set, so publishToMavenLocal works
+// without one.
+signing {
+    isRequired = providers.gradleProperty("signingInMemoryKey").isPresent
 }
