@@ -17,7 +17,7 @@ is forwarded back into the call.
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.0")
+    implementation("io.telloai:tello-sdk:0.1.1")
 }
 ```
 

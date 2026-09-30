@@ -17,7 +17,7 @@ Java용 Tello SDK. turn-provider-gateway `/sdk` 엔드포인트에 붙는 얇은
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.0")
+    implementation("io.telloai:tello-sdk:0.1.1")
 }
 ```
 
