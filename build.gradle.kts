@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "ai.tello"
+group = "io.telloai"
 version = "0.1.0"
 
 java {

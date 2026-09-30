@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed (breaking — Maven group and Java package)
+
+- Maven coordinates are `io.telloai:tello-sdk` (was `ai.tello:tello-sdk`) and
+  every class moved from `ai.tello` to `io.telloai` (`io.telloai.TelloClient`,
+  `io.telloai.events.*`, `io.telloai.errors.*`). Maven Central only grants a
+  domain namespace to the domain's owner, and `tello.ai` is not ours; the
+  service lives on `telloai.io`. Nothing was published under the old group.
+- License is Apache-2.0, declared in the published POM.
+
 ### Removed (breaking — SMS off the SDK contract)
 
 - `sendSms` removed entirely (`TelloClient.sendSms(to, message)` /

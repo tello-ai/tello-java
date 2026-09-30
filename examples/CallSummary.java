@@ -1,15 +1,15 @@
 // Live integration example: places one real call and retrieves its summary.
 // Not part of the Gradle build.
 
-import ai.tello.EventType;
-import ai.tello.TelloClient;
-import ai.tello.events.AnswerAcceptedEvent;
-import ai.tello.events.CallSummaryEvent;
-import ai.tello.events.ErrorEvent;
-import ai.tello.events.Event;
-import ai.tello.events.StatusChangedEvent;
-import ai.tello.events.TerminalEvent;
-import ai.tello.events.TurnEvent;
+import io.telloai.EventType;
+import io.telloai.TelloClient;
+import io.telloai.events.AnswerAcceptedEvent;
+import io.telloai.events.CallSummaryEvent;
+import io.telloai.events.ErrorEvent;
+import io.telloai.events.Event;
+import io.telloai.events.StatusChangedEvent;
+import io.telloai.events.TerminalEvent;
+import io.telloai.events.TurnEvent;
 import java.net.URI;
 import java.util.Set;
 import java.util.UUID;

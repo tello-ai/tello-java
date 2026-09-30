@@ -1,9 +1,9 @@
 // Illustrative example (not part of the Gradle build).
 // Run against a locally-running turn-provider-gateway.
 
-import ai.tello.EventType;
-import ai.tello.TelloClient;
-import ai.tello.events.TurnEvent;
+import io.telloai.EventType;
+import io.telloai.TelloClient;
+import io.telloai.events.TurnEvent;
 
 public class BasicCall {
 
@@ -20,10 +20,10 @@ public class BasicCall {
             });
 
             client.on(EventType.CALL_COMPLETED, e ->
-                    System.out.println("[completed] " + ((ai.tello.events.Event) e).callId));
+                    System.out.println("[completed] " + ((io.telloai.events.Event) e).callId));
 
             client.on(EventType.ERROR, e -> {
-                ai.tello.events.ErrorEvent err = (ai.tello.events.ErrorEvent) e;
+                io.telloai.events.ErrorEvent err = (io.telloai.events.ErrorEvent) e;
                 System.out.println("[error] " + err.code + ": " + err.message);
             });
 

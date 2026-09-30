@@ -7,7 +7,7 @@ Java용 Tello SDK. turn-provider-gateway `/sdk` 엔드포인트에 붙는 얇은
 게이트웨이는 진행 중인 통화에서 상대방이 말한 턴을 실시간으로 넘겨주고,
 핸들러가 만든 답변은 다시 통화로 전달됩니다.
 
-> 저장소: `tello-java` · Maven 아티팩트: `ai.tello:tello-sdk` · 패키지: `ai.tello`
+> 저장소: `tello-java` · Maven 아티팩트: `io.telloai:tello-sdk` · 패키지: `io.telloai`
 >
 > 전송 계층은 WebSocket뿐입니다. REST나 webhook은 제공하지 않습니다. 프로토콜
 > 계약은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에 있습니다.
@@ -17,7 +17,7 @@ Java용 Tello SDK. turn-provider-gateway `/sdk` 엔드포인트에 붙는 얇은
 
 ```kotlin
 dependencies {
-    implementation("ai.tello:tello-sdk:0.1.0")
+    implementation("io.telloai:tello-sdk:0.1.0")
 }
 ```
 
@@ -142,7 +142,7 @@ WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으�
 
 ## 7. 버전 호환성
 
-`ai.tello:tello-sdk 0.1.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
+`io.telloai:tello-sdk 0.1.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
 
 프레임 계약 전문은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에
 있고, [`docs/events/sdk-events.v1.schema.json`](docs/events/sdk-events.v1.schema.json)과

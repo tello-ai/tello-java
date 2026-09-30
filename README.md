@@ -7,7 +7,7 @@ turn-provider-gateway `/sdk` endpoint. The SDK is the "conversation brain": the
 gateway streams each caller turn from a live phone call, and your handler's reply
 is forwarded back into the call.
 
-> repo: `tello-java` · Maven artifact: `ai.tello:tello-sdk` · package: `ai.tello`
+> repo: `tello-java` · Maven artifact: `io.telloai:tello-sdk` · package: `io.telloai`
 >
 > Transport is WebSocket only. There is no REST or webhook surface. The protocol
 > contract lives in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md).
@@ -17,7 +17,7 @@ is forwarded back into the call.
 
 ```kotlin
 dependencies {
-    implementation("ai.tello:tello-sdk:0.1.0")
+    implementation("io.telloai:tello-sdk:0.1.0")
 }
 ```
 
@@ -137,7 +137,7 @@ They place real calls. Read [`examples/README.md`](examples/README.md) first.
 
 ## 7. Version compatibility
 
-`ai.tello:tello-sdk 0.1.x` implements Tello WS protocol `1.0`.
+`io.telloai:tello-sdk 0.1.x` implements Tello WS protocol `1.0`.
 
 The full frame contract is in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md),
 with [`docs/events/sdk-events.v1.schema.json`](docs/events/sdk-events.v1.schema.json)
