@@ -104,9 +104,18 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     /**
      * Appends {@code sdk}, {@code version} and {@code protocol} to the upgrade URL so the
      * gateway can log which client connected. The path and other query params are kept;
-     * those three keys replace any the URL already had.
+     * those three keys replace any the URL already had. A URL this cannot parse is
+     * returned unchanged, so connecting behaves exactly as it did without the query.
      */
     static URI withClientIdentity(String url) {
+        try {
+            return appendClientIdentity(url);
+        } catch (RuntimeException e) {
+            return URI.create(url);
+        }
+    }
+
+    private static URI appendClientIdentity(String url) {
         String base = url;
         String fragment = "";
         int hash = base.indexOf('#');
