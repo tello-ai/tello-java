@@ -12,13 +12,19 @@ import io.telloai.events.ErrorEvent;
 import io.telloai.events.Event;
 import io.telloai.events.EventParser;
 import io.telloai.events.TelloEvent;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -78,6 +84,57 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private static final int CLOSE_UNAUTHENTICATED = 4401;
     private static final int CLOSE_SESSION_REPLACED = 4429;
     private static final long CLOSE_WAIT_MILLIS = 5_000L;
+
+    /** This SDK's package version, read from the resource the build fills in. */
+    static final String SDK_VERSION = loadSdkVersion();
+
+    private static String loadSdkVersion() {
+        try (InputStream in = TelloClient.class.getResourceAsStream("sdk-version.properties")) {
+            if (in == null) {
+                return "unknown";
+            }
+            Properties props = new Properties();
+            props.load(in);
+            return props.getProperty("version", "unknown");
+        } catch (IOException e) {
+            return "unknown";
+        }
+    }
+
+    /**
+     * Appends {@code sdk}, {@code version} and {@code protocol} to the upgrade URL so the
+     * gateway can log which client connected. The path and other query params are kept;
+     * those three keys replace any the URL already had.
+     */
+    static URI withClientIdentity(String url) {
+        String base = url;
+        String fragment = "";
+        int hash = base.indexOf('#');
+        if (hash >= 0) {
+            fragment = base.substring(hash);
+            base = base.substring(0, hash);
+        }
+        StringBuilder query = new StringBuilder();
+        int q = base.indexOf('?');
+        if (q >= 0) {
+            for (String pair : base.substring(q + 1).split("&")) {
+                int eq = pair.indexOf('=');
+                String key = URLDecoder.decode(
+                        eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8);
+                if (pair.isEmpty() || key.equals("sdk") || key.equals("version")
+                        || key.equals("protocol")) {
+                    continue;
+                }
+                query.append(pair).append('&');
+            }
+            base = base.substring(0, q);
+        }
+        query.append("sdk=java&version=")
+                .append(URLEncoder.encode(SDK_VERSION, StandardCharsets.UTF_8))
+                .append("&protocol=")
+                .append(URLEncoder.encode(PublicStatus.PROTOCOL_VERSION, StandardCharsets.UTF_8));
+        return URI.create(base + "?" + query + fragment);
+    }
 
     private final ClientConfig config;
     private final HttpClient http = HttpClient.newHttpClient();
@@ -180,7 +237,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         }
         return http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofMillis(config.connectTimeoutMillis()))
-                .buildAsync(URI.create(config.url()), new Listener())
+                .buildAsync(withClientIdentity(config.url()), new Listener())
                 .thenCompose(webSocket -> {
                     this.ws = webSocket;
                     return authenticate(webSocket);

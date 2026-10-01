@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added (client identity on the upgrade URL)
+
+- The WebSocket upgrade URL now carries `sdk=java`, `version=<package version>`
+  and `protocol=<PROTOCOL_VERSION>` so the gateway can log which client
+  connected. The URL's path and other query parameters are kept; those three
+  keys replace any it already had. The version comes from the Gradle build.
+
 ## 0.1.1 (2026-09-30)
 
 ### Fixed (production gateway by default)

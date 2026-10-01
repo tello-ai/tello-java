@@ -47,6 +47,12 @@ or via `TELLO_API_KEY` / `TELLO_URL` environment variables (a no-arg
 `new TelloClient()` reads them). Without a URL argument or `TELLO_URL`, the client
 connects to `wss://api.telloai.io/sdk`.
 
+The upgrade URL also carries `sdk=java`, `version=<this package's version>` and
+`protocol=<PROTOCOL_VERSION>` (for example
+`wss://api.telloai.io/sdk?sdk=java&version=0.1.1&protocol=1.0`) so the gateway can log
+which client connected. Your URL's path and other query parameters are kept; those
+three keys replace any it already has. The server never rejects a connection over them.
+
 A rejected key (`unauthenticated` error frame or close 4401) or an `auth.ok` wait
 timeout (the connect timeout, 10 s by default) makes `connect()` /
 `connectBlocking()` fail with an `AuthenticationException`. A transport failure
