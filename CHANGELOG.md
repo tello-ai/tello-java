@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 (2026-10-01)
+
+### Fixed (release)
+
+- Same code as 0.1.2. The Maven Central publication of 0.1.2 never completed, so
+  0.1.2 cannot be downloaded; use 0.1.3. It carries the client identity query
+  described under 0.1.2.
+
 ## 0.1.2 (2026-10-01)
 
 ### Added (client identity on the upgrade URL)

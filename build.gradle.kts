@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.telloai"
-version = "0.1.2"
+version = "0.1.3"
 
 java {
     toolchain { languageVersion.set(JavaLanguageVersion.of(17)) }
