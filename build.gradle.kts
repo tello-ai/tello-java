@@ -25,7 +25,18 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
-tasks.test { useJUnitPlatform() }
+tasks.test {
+    useJUnitPlatform()
+    systemProperty("tello.gradleVersion", project.version.toString())
+}
+
+// The client reports its own version in the upgrade URL; it reads it from this
+// resource so the Gradle version above stays the only copy.
+tasks.processResources {
+    val sdkVersion = project.version.toString()
+    inputs.property("sdkVersion", sdkVersion)
+    filesMatching("io/telloai/sdk-version.properties") { expand("version" to sdkVersion) }
+}
 
 // Sources carry Korean text; never fall back to the platform default charset.
 tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
