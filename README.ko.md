@@ -19,7 +19,7 @@ Gradle:
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.1")
+    implementation("io.telloai:tello-sdk:0.1.2")
 }
 ```
 
@@ -29,7 +29,7 @@ Maven:
 <dependency>
     <groupId>io.telloai</groupId>
     <artifactId>tello-sdk</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
 </dependency>
 ```
 

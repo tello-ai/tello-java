@@ -19,7 +19,7 @@ Gradle:
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.1")
+    implementation("io.telloai:tello-sdk:0.1.2")
 }
 ```
 
@@ -29,7 +29,7 @@ Maven:
 <dependency>
     <groupId>io.telloai</groupId>
     <artifactId>tello-sdk</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
 </dependency>
 ```
 
@@ -49,7 +49,7 @@ connects to `wss://api.telloai.io/sdk`.
 
 The upgrade URL also carries `sdk=java`, `version=<this package's version>` and
 `protocol=<PROTOCOL_VERSION>` (for example
-`wss://api.telloai.io/sdk?sdk=java&version=0.1.1&protocol=1.0`) so the gateway can log
+`wss://api.telloai.io/sdk?sdk=java&version=0.1.2&protocol=1.0`) so the gateway can log
 which client connected. Your URL's path and other query parameters are kept; those
 three keys replace any it already has. The server never rejects a connection over them.
 

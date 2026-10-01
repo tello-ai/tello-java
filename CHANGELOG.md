@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 (2026-10-01)
 
 ### Added (client identity on the upgrade URL)
 
