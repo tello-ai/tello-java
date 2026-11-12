@@ -227,8 +227,8 @@ JsonObject created = api.tools().create(tool, "create-end-call-1").join();
   reuse it.
 - **Bodies and results** are Gson `JsonObject`s shaped as in the public REST docs;
   fields this SDK does not know are kept. Every method returns a
-  `CompletableFuture`. An empty id or an invalid idempotency key (1–255 bytes, no
-  comma or control characters) throws `IllegalArgumentException` before any request.
+  `CompletableFuture`. An empty id or an invalid idempotency key (1–255 printable
+  ASCII characters, no comma) throws `IllegalArgumentException` before any request.
 
 | method | HTTP | result |
 | --- | --- | --- |

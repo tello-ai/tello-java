@@ -84,7 +84,7 @@ class TelloApiTransportTest {
 
     @Test
     void rejectsAnInvalidIdempotencyKeyWithoutARequest() {
-        for (String bad : new String[] {"", "a,b", "a\nb", "a\u0001b", "x".repeat(256)}) {
+        for (String bad : new String[] {"", "a,b", "a\nb", "a\u0001b", "a\u007fb", "café", "키", "x".repeat(256)}) {
             assertThrows(IllegalArgumentException.class,
                     () -> api.request("POST", "/tools", null, new JsonObject(), bad, api.timeout(), 201));
         }

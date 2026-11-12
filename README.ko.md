@@ -221,7 +221,7 @@ JsonObject created = api.tools().create(tool, "create-end-call-1").join();
   같은 키로 다시 보내세요.
 - **본문과 결과**는 공개 REST 문서 모양 그대로인 Gson `JsonObject`이고, SDK가 모르는
   칸도 잃지 않습니다. 모든 메서드는 `CompletableFuture`를 돌려줍니다. 빈 id나 잘못된
-  멱등 키(1~255바이트, 쉼표·제어 문자 없음)는 요청 없이 `IllegalArgumentException`을
+  멱등 키(출력 가능한 ASCII 1~255자, 쉼표 없음)는 요청 없이 `IllegalArgumentException`을
   던집니다.
 
 | 메서드 | HTTP | 결과 |

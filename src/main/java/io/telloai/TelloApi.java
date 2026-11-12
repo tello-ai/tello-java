@@ -52,7 +52,7 @@ public final class TelloApi {
     public static final Duration DEFAULT_LONG_TIMEOUT = Duration.ofSeconds(120);
 
     static final String USER_AGENT = "tello-java-sdk/" + TelloClient.SDK_VERSION;
-    private static final int MAX_IDEMPOTENCY_KEY_BYTES = 255;
+    private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 255;
     private static final Gson GSON = new Gson();
 
     private final String apiKey;
@@ -198,19 +198,18 @@ public final class TelloApi {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    /** 1–255 UTF-8 bytes, no comma and no control character; null means none. */
+    /** 1–255 printable ASCII characters (0x20–0x7E) without a comma; null means none. */
     static void checkIdempotencyKey(String key) {
         if (key == null) {
             return;
         }
-        int bytes = key.getBytes(StandardCharsets.UTF_8).length;
-        if (bytes < 1 || bytes > MAX_IDEMPOTENCY_KEY_BYTES) {
-            throw new IllegalArgumentException("idempotencyKey must be 1-255 bytes");
+        if (key.isEmpty() || key.length() > MAX_IDEMPOTENCY_KEY_LENGTH) {
+            throw new IllegalArgumentException("idempotencyKey must be 1-255 characters");
         }
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);
-            if (c == ',' || c < 0x20 || c == 0x7f) {
-                throw new IllegalArgumentException("idempotencyKey must not contain commas or control characters");
+            if (c == ',' || c < 0x20 || c > 0x7e) {
+                throw new IllegalArgumentException("idempotencyKey must be printable ASCII without commas");
             }
         }
     }
