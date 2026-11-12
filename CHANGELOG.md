@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Added (REST resource API)
+
+- `io.telloai.TelloApi`, a REST client for the public API (`https://api.telloai.io/v1`),
+  separate from the realtime `TelloClient`. Resources: `tools()` (list with
+  `limit`/`cursor`, get, create, update, delete), `agents()` and `crews()` (list, get,
+  create, update, delete), `crews().generate` / `generateAndWait` with
+  `crewGenerations().get`, and `callDrafts()` (create, revise, confirm). Every method
+  returns a `CompletableFuture`; bodies and results are Gson `JsonObject`s, so unknown
+  fields are kept. Uses the built-in `java.net.http.HttpClient`; no new dependency.
+- Key from the argument or `TELLO_API_KEY`; URL from the argument, `TELLO_API_URL`, or
+  `https://api.telloai.io/v1` (https only; plain http for loopback hosts). Requests send
+  `User-Agent: tello-java-sdk/<version>`. Timeouts are 30 s, and 120 s for call draft
+  create/revise/confirm and crew generation; both can be changed on
+  `TelloApi.builder()`. Nothing is retried automatically.
+- `Idempotency-Key` is sent only when given, except `callDrafts().confirm`, which
+  generates a UUID when none is given and reports it on failure.
+- Errors: `TelloApiException` (`status`, snake_case `code` as the server sent it,
+  `data`, `idempotencyKey`; `http_<status>` for non-envelope responses,
+  `invalid_response` for undocumented success statuses or non-object bodies),
+  `TelloApiConnectionException` (no response; the cause is kept) and
+  `CrewGenerationTimeoutException` (`generateAndWait` ran out of time; carries the job
+  id).
+
+### Changed (docs)
+
+- The gateway is now called the API gateway (api-gateway). The README and package
+  description use the new name, and `docs/protocol`, `docs/events` and `docs/errors`
+  are synced from the gateway's canonical copies.
+
 ## 0.1.3 (2026-10-01)
 
 ### Fixed (release)

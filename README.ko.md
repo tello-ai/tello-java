@@ -2,15 +2,17 @@
 
 # tello-java
 
-Java용 Tello SDK. turn-provider-gateway `/sdk` 엔드포인트에 붙는 얇은
-**WebSocket** 실시간 클라이언트입니다. SDK가 대화의 두뇌를 맡습니다.
-게이트웨이는 진행 중인 통화에서 상대방이 말한 턴을 실시간으로 넘겨주고,
-핸들러가 만든 답변은 다시 통화로 전달됩니다.
+Java용 Tello SDK. API 게이트웨이(api-gateway) `/sdk` 엔드포인트에 붙는 얇은
+**WebSocket** 실시간 클라이언트와, 공개 자원 API(도구·에이전트·크루·크루 자동
+생성·통화 초안)를 다루는 **REST** 클라이언트를 담고 있습니다. WebSocket 쪽에서는
+SDK가 대화의 두뇌를 맡습니다. 게이트웨이는 진행 중인 통화에서 상대방이 말한 턴을
+실시간으로 넘겨주고, 핸들러가 만든 답변은 다시 통화로 전달됩니다.
 
 > 저장소: `tello-java` · Maven 아티팩트: `io.telloai:tello-sdk` · 패키지: `io.telloai`
 >
-> 전송 계층은 WebSocket뿐입니다. REST나 webhook은 제공하지 않습니다. 프로토콜
-> 계약은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에 있습니다.
+> 실시간 클라이언트(`TelloClient`)는 WebSocket만 씁니다. 프로토콜 계약은
+> [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에 있습니다. REST 자원
+> API는 별도 클라이언트 `TelloApi`입니다(§6). webhook은 제공하지 않습니다.
 > `tello-python`에서 이식했고, 게이트웨이 기준 동작이 1:1로 같습니다.
 
 ## 1. 설치
@@ -34,7 +36,8 @@ Maven:
 ```
 
 Java 17 이상이 필요합니다. 런타임 의존성은 Gson 하나뿐이고, WebSocket 전송은
-내장 `java.net.http.WebSocket`을 씁니다.
+내장 `java.net.http.WebSocket`을, REST 클라이언트는 내장
+`java.net.http.HttpClient`를 씁니다.
 
 ## 2. API 키
 
@@ -186,7 +189,113 @@ WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으�
 재연결이나 세션 재개 프로토콜은 없습니다. 비정상 종료가 나면 재연결이 필요한
 상황으로 보고 통화를 처음부터 다시 시작하세요.
 
-## 6. 예제
+## 6. REST 자원 API
+
+`TelloApi`는 공개 REST API(`https://api.telloai.io/v1`)로 계정의 자원을 다룹니다.
+`TelloClient`와 별개이며 WebSocket 연결이 필요 없습니다.
+
+> **쓰기는 즉시 운영에 반영됩니다.** 도구·에이전트·크루를 만들거나 고치거나 지우면
+> 진행 중인 통화에도 바로 배포됩니다. **`callDrafts().confirm(...)`은 실제로 과금되는
+> 전화를 겁니다.**
+
+```java
+TelloApi api = new TelloApi();          // $TELLO_API_KEY, $TELLO_API_URL
+JsonObject agents = api.agents().list().join();
+
+JsonObject tool = new JsonObject();
+tool.addProperty("type", "endCall");
+tool.addProperty("name", "통화 종료");
+tool.addProperty("functionName", "end_call");
+JsonObject created = api.tools().create(tool, "create-end-call-1").join();
+```
+
+- **키와 URL**: `new TelloApi(apiKey)` / `new TelloApi(apiKey, apiUrl)`로 넘기거나
+  `TELLO_API_KEY` / `TELLO_API_URL` 환경 변수를 씁니다(인자가 우선). URL이 둘 다
+  없으면 `https://api.telloai.io/v1`을 씁니다. URL은 `https`여야 하고, `http`는
+  `localhost`·`127.0.0.1`·`::1`에만 허용합니다. 키는 `Authorization: Bearer <key>`로만
+  보내고 `toString()`이나 오류 메시지에 나오지 않습니다. 모든 요청에
+  `User-Agent: tello-java-sdk/<버전>`이 붙습니다.
+- **타임아웃**: 30초. 통화 초안 만들기·고치기·확정과 크루 자동 생성은 120초.
+  `TelloApi.builder().apiKey(k).timeout(d).longTimeout(d).build()`로 바꿀 수 있습니다.
+- **자동 재시도는 하지 않습니다.** 만들기를 안전하게 다시 보내려면 멱등 키를 주고
+  같은 키로 다시 보내세요.
+- **본문과 결과**는 공개 REST 문서 모양 그대로인 Gson `JsonObject`이고, SDK가 모르는
+  칸도 잃지 않습니다. 모든 메서드는 `CompletableFuture`를 돌려줍니다. 빈 id나 잘못된
+  멱등 키(1~255바이트, 쉼표·제어 문자 없음)는 요청 없이 `IllegalArgumentException`을
+  던집니다.
+
+| 메서드 | HTTP | 결과 |
+| --- | --- | --- |
+| `tools().list()` / `list(limit, cursor)` | `GET /tools` | `{data, nextCursor}` |
+| `tools().get(id)` | `GET /tools/{id}` | 도구 |
+| `tools().create(body[, idempotencyKey])` | `POST /tools` (201) | 도구 |
+| `tools().update(id, patch)` | `PATCH /tools/{id}` | 도구 |
+| `tools().delete(id)` | `DELETE /tools/{id}` (204) | `null` |
+| `agents().list()` | `GET /agents` | `{data}` |
+| `agents().get/create/update/delete` | `/agents[/{id}]` | 에이전트 / `null` |
+| `crews().list()` | `GET /crews` | `{data}` |
+| `crews().get/create/update/delete` | `/crews[/{id}]` | 크루 / `null` |
+| `crews().generate(input[, idempotencyKey])` | `POST /crews/generate` (202, 기존 작업이면 200) | 작업 |
+| `crews().generateAndWait(input[, pollInterval, timeout, idempotencyKey])` | 생성 후 폴링 | 끝난 작업 |
+| `crewGenerations().get(id)` | `GET /crew-generations/{id}` | 작업 |
+| `callDrafts().create(body[, idempotencyKey])` | `POST /call-drafts` (201) | 초안 |
+| `callDrafts().revise(draftId, request[, idempotencyKey])` | `POST /call-drafts/{id}/revise` | 새 초안(새 id) |
+| `callDrafts().confirm(draftId[, idempotencyKey])` | `POST /call-drafts/{id}/confirm` (201) | 통화 |
+
+`generateAndWait`는 기본으로 2초마다 최대 600초 동안 작업을 조회하고, `running`이
+아니게 되면 그 작업으로 완료됩니다. `failed` 작업도 예외가 아니라 결과로 돌려주므로
+`status`로 분기하세요. 시간이 다 되면 `CrewGenerationTimeoutException`
+(`TimeoutException`, `.generationId`에 작업 id. 작업은 서버에서 계속 돕니다)으로
+실패합니다. 초안의 모든 상태(`pendingConfirmation`·`needsClarification`·`refused`·
+`confirmed`)는 성공 결과입니다.
+
+`confirm`은 서버가 요구하므로 항상 `Idempotency-Key`를 보냅니다. 준 키가 없으면
+UUID를 만들어 보내고, 실패한 오류에 그 키를 싣습니다. 다시 보낼 때는 반드시 그
+키로 보내야 응답을 잃어도 통화가 두 번 걸리지 않습니다.
+
+### REST 오류
+
+실패한 요청은 future를 예외로 완료합니다(`join()`은 오류를 `CompletionException`으로
+감쌉니다):
+
+- `TelloApiException` — 서버가 오류로 답했습니다. `.status`는 HTTP 상태,
+  `.code`는 서버 `error` 원문(snake_case, 공개 오류 표와 같음), `.getMessage()`는
+  메시지, `.data`는 `data` 객체 또는 `null`, `.idempotencyKey`는 요청에 실은 키 또는
+  `null`입니다. API 오류 봉투가 아닌 응답(프록시 페이지 등)은 `code`가
+  `http_<상태>`, 문서에 없는 성공 상태나 JSON 객체가 아닌 성공 본문은
+  `invalid_response`입니다.
+- `TelloApiConnectionException` — 응답을 받지 못했습니다(연결 실패·타임아웃,
+  `getCause()`가 전송 오류). **쓰기라면 이미 반영됐을 수 있습니다.** 다시 보내기
+  전에 get이나 list로 확인하고, 같은 멱등 키로 보내세요.
+
+둘 다 `TelloException`을 상속합니다. `code`로 분기하세요:
+
+| 상태 | `code` | 뜻 |
+| --- | --- | --- |
+| 401 | `unauthenticated` | 키가 없거나 틀렸거나 폐기됐습니다 |
+| 403 | `insufficient_scope` | 이 요청에 필요한 권한이 키에 없습니다 |
+| 404 | `tool_not_found` / `agent_not_found` / `crew_not_found` | 계정에 그 자원이 없습니다 |
+| 409 | `tool_in_use` / `agent_in_use` / `crew_in_use` | 아직 다른 곳에서 쓰고 있습니다. `data`를 보세요 |
+| 409 | `crew_generation_in_progress` | 다른 크루를 만드는 중입니다. `data.id`가 그 작업입니다 |
+| 404 | `draft_not_found` | 그 통화 초안이 없습니다 |
+| 409 | `idempotency_key_reused` | 같은 키를 다른 요청에 썼습니다 |
+| 502 | `write_outcome_unknown` | 반영됐는지 알 수 없습니다 |
+
+전체 목록은 공개 REST 오류 문서에 있습니다.
+
+```java
+try {
+    api.tools().get("tool_123").join();
+} catch (CompletionException e) {
+    if (e.getCause() instanceof TelloApiException err && err.code.equals("tool_not_found")) {
+        // 새로 만들거나 없는 도구로 보고합니다
+    } else {
+        throw e;
+    }
+}
+```
+
+## 7. 예제
 
 독립 실행형 프로그램이 [`examples/`](examples/README.ko.md)에 있습니다.
 `BasicCall`은 연결해서 통화 1건을 걸고 각 턴에 응답하고, `CallSummary`는
@@ -197,7 +306,7 @@ WS 수준 ping heartbeat는 게이트웨이가 주도하고, pong은 자동으�
 두 예제 모두 실제 통화를 겁니다. 먼저
 [`examples/README.ko.md`](examples/README.ko.md)를 읽으세요.
 
-## 7. 버전 호환성
+## 8. 버전 호환성
 
 `io.telloai:tello-sdk 0.1.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
 
