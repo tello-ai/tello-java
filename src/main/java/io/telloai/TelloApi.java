@@ -60,6 +60,7 @@ public final class TelloApi {
     private final Duration timeout;
     private final Duration longTimeout;
     private final HttpClient http;
+    private final Tools tools = new Tools(this);
 
     /** A client with the key from {@code $TELLO_API_KEY} and the URL from {@code $TELLO_API_URL} or the default. */
     public TelloApi() {
@@ -103,6 +104,11 @@ public final class TelloApi {
     /** The base URL requests go to, without a trailing {@code /}. */
     public String apiUrl() {
         return apiUrl;
+    }
+
+    /** Tools ({@code /tools}) agents can call during a call. */
+    public Tools tools() {
+        return tools;
     }
 
     Duration timeout() {
