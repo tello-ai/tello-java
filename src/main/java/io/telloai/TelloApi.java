@@ -61,6 +61,8 @@ public final class TelloApi {
     private final Duration longTimeout;
     private final HttpClient http;
     private final Tools tools = new Tools(this);
+    private final Agents agents = new Agents(this);
+    private final Crews crews = new Crews(this);
 
     /** A client with the key from {@code $TELLO_API_KEY} and the URL from {@code $TELLO_API_URL} or the default. */
     public TelloApi() {
@@ -109,6 +111,16 @@ public final class TelloApi {
     /** Tools ({@code /tools}) agents can call during a call. */
     public Tools tools() {
         return tools;
+    }
+
+    /** Agents ({@code /agents}): list them, and read, create, change or delete one. */
+    public Agents agents() {
+        return agents;
+    }
+
+    /** Crews ({@code /crews}): list them, read, create, change or delete one, or generate one from a goal. */
+    public Crews crews() {
+        return crews;
     }
 
     Duration timeout() {
