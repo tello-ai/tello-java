@@ -36,19 +36,19 @@ abstract class CrudResource {
      * none). Resending the same body with the same key returns the first result.
      */
     public CompletableFuture<JsonObject> create(JsonObject body, String idempotencyKey) {
-        return api.request("POST", path, null, required(body, "body"), idempotencyKey, api.timeout(), 201);
+        return api.request("POST", path, null, required(body, "body"), idempotencyKey, api.longTimeout(), 201);
     }
 
     /** Changes the fields in {@code patch} ({@code 200}); it goes live at once. */
     public CompletableFuture<JsonObject> update(String id, JsonObject patch) {
         String target = path + "/" + TelloApi.segment(id, idName);
-        return api.request("PATCH", target, null, required(patch, "patch"), null, api.timeout(), 200);
+        return api.request("PATCH", target, null, required(patch, "patch"), null, api.longTimeout(), 200);
     }
 
     /** Deletes an item ({@code 204}); the future completes with null. */
     public CompletableFuture<Void> delete(String id) {
         String target = path + "/" + TelloApi.segment(id, idName);
-        return api.request("DELETE", target, null, null, null, api.timeout(), 204).thenApply(ignored -> null);
+        return api.request("DELETE", target, null, null, null, api.longTimeout(), 204).thenApply(ignored -> null);
     }
 
     static JsonObject required(JsonObject body, String name) {

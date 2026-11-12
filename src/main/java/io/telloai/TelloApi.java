@@ -43,11 +43,12 @@ public final class TelloApi {
 
     public static final String DEFAULT_API_URL = "https://api.telloai.io/v1";
     public static final String ENV_API_URL = "TELLO_API_URL";
-    /** Timeout of most requests. */
+    /** Timeout of reads (get and list). */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
     /**
-     * Timeout of the requests the service may take long to answer: call draft create,
-     * revise and confirm, and crew generation.
+     * Timeout of every write, which the service may take long to answer: tool, agent and
+     * crew create, update and delete, crew generation, and call draft create, revise and
+     * confirm.
      */
     public static final Duration DEFAULT_LONG_TIMEOUT = Duration.ofSeconds(120);
 
@@ -387,15 +388,15 @@ public final class TelloApi {
             return this;
         }
 
-        /** Timeout of most requests (default 30 seconds). */
+        /** Timeout of reads, get and list (default 30 seconds). */
         public Builder timeout(Duration timeout) {
             this.timeout = timeout;
             return this;
         }
 
         /**
-         * Timeout of call draft create, revise and confirm and of crew generation
-         * (default 120 seconds).
+         * Timeout of writes: tool, agent and crew create/update/delete, crew generation,
+         * and call draft create/revise/confirm (default 120 seconds).
          */
         public Builder longTimeout(Duration timeout) {
             this.longTimeout = timeout;

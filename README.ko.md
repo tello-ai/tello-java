@@ -220,7 +220,8 @@ JsonObject created = api.tools().create(tool, "create-end-call-1").join();
   `localhost`·`127.0.0.1`·`::1`에만 허용합니다. 키는 `Authorization: Bearer <key>`로만
   보내고 `toString()`이나 오류 메시지에 나오지 않습니다. 모든 요청에
   `User-Agent: tello-java-sdk/<버전>`이 붙습니다.
-- **타임아웃**: 30초. 통화 초안 만들기·고치기·확정과 크루 자동 생성은 120초.
+- **타임아웃**: 조회(get·list)는 30초. 쓰기(도구·에이전트·크루 만들기·고치기·지우기, 크루 자동
+  생성, 통화 초안 만들기·고치기·확정)는 120초.
   `TelloApi.builder().apiKey(k).timeout(d).longTimeout(d).build()`로 바꿀 수 있습니다.
 - **자동 재시도는 하지 않습니다.** 만들기를 안전하게 다시 보내려면 멱등 키를 주고
   같은 키로 다시 보내세요.

@@ -13,8 +13,9 @@
   fields are kept. Uses the built-in `java.net.http.HttpClient`; no new dependency.
 - Key from the argument or `TELLO_API_KEY`; URL from the argument, `TELLO_API_URL`, or
   `https://api.telloai.io/v1` (https only; plain http for loopback hosts). Requests send
-  `User-Agent: tello-java-sdk/<version>`. Timeouts are 30 s, and 120 s for call draft
-  create/revise/confirm and crew generation; both can be changed on
+  `User-Agent: tello-java-sdk/<version>`. Timeouts are 30 s for reads (get, list) and
+  120 s for every write (tool, agent and crew create/update/delete, crew generation,
+  call draft create/revise/confirm); both can be changed on
   `TelloApi.builder()`. Nothing is retried automatically.
 - `Idempotency-Key` is sent only when given, except `callDrafts().confirm`, which
   generates a UUID when none is given and reports it on failure.

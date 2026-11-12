@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.gson.JsonObject;
+import io.telloai.errors.TelloApiConnectionException;
 import io.telloai.errors.TelloApiException;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -37,9 +39,26 @@ class TelloApiAgentsCrewsTest {
     }
 
     static Stream<Arguments> resources() {
+        Function<TelloApi, CrudResource> tools = TelloApi::tools;
         Function<TelloApi, CrudResource> agents = TelloApi::agents;
         Function<TelloApi, CrudResource> crews = TelloApi::crews;
-        return Stream.of(Arguments.of("/v1/agents", agents), Arguments.of("/v1/crews", crews));
+        return Stream.of(Arguments.of("/v1/tools", tools), Arguments.of("/v1/agents", agents),
+                Arguments.of("/v1/crews", crews));
+    }
+
+    @ParameterizedTest
+    @MethodSource("resources")
+    void writesWaitTheLongTimeoutWhileGetUsesTheShortOne(String base, Function<TelloApi, CrudResource> of) {
+        TelloApi timed = TelloApi.builder().apiKey("k").apiUrl(fake.url())
+                .timeout(Duration.ofMillis(300)).longTimeout(Duration.ofSeconds(5)).build();
+        fake.replyAfter(800, 201, "{\"id\":\"n1\"}")
+                .replyAfter(800, 200, "{\"id\":\"n1\"}")
+                .replyAfter(800, 204, "")
+                .replyAfter(800, 200, "{\"id\":\"n1\"}");
+        of.apply(timed).create(new JsonObject()).join();
+        of.apply(timed).update("n1", new JsonObject()).join();
+        of.apply(timed).delete("n1").join();
+        assertInstanceOf(TelloApiConnectionException.class, failure(of.apply(timed).get("n1")));
     }
 
     @Test

@@ -225,8 +225,9 @@ JsonObject created = api.tools().create(tool, "create-end-call-1").join();
   plain `http` is accepted only for `localhost`, `127.0.0.1` and `::1`. The key is
   sent as `Authorization: Bearer <key>` and never appears in `toString()` or error
   messages. Every request carries `User-Agent: tello-java-sdk/<version>`.
-- **Timeouts**: 30 seconds; 120 seconds for call draft create/revise/confirm and
-  crew generation. Change them with
+- **Timeouts**: 30 seconds for reads (get, list); 120 seconds for every write (tool,
+  agent and crew create/update/delete, crew generation, call draft
+  create/revise/confirm). Change them with
   `TelloApi.builder().apiKey(k).timeout(d).longTimeout(d).build()`.
 - **No automatic retries.** To retry a create safely, pass an idempotency key and
   reuse it.
