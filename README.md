@@ -121,6 +121,8 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | gateway `code` | exception |
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (also close code 4401) |
+| `ipNotAllowed` | `AuthenticationException` (with `.ip`; also close code 4401) |
+| `insufficientScope` | `PermissionDeniedException` (with `.requiredScope`; only that command is refused, the connection stays open) |
 | `toRequired` | `ValidationException` |
 | `callIdRequired` | `ValidationException` |
 | `dtmfDigitsRequired` | `ValidationException` |
@@ -132,7 +134,10 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | `callRejected` | `CallRejectedException` (with `.question`) |
 | `internalError` | `TelloServerException` |
 
-An unrecognised code falls back to `TelloServerException`.
+An unrecognised code falls back to `TelloServerException`. An `internalError`
+answering `auth` (close 1011: the gateway could not check the key) fails `connect()`
+with a `TelloServerException` rather than an `AuthenticationException`; the key was
+not refused, so reconnecting later may work.
 
 Every error carries the gateway code on `.code` — branch on that, never on
 `.getMessage()`, which is display text the gateway may reword.
@@ -175,14 +180,14 @@ is delivered only as an `EventType.ERROR` event; the call keeps running and
 `ConnectionClosedException`; session displaced (close 4429) →
 `SessionReplacedException`.
 
-An `ErrorEvent` carries the raw `code`, `message`, and `question`. To handle it as
-the typed exception `waitClosed()` would throw, map it with
-`Errors.exceptionFor(code, message, question)` from `io.telloai.errors`:
+An `ErrorEvent` carries the raw `code`, `message`, `question`, `requiredScope` and
+`ip`. To handle it as the typed exception `waitClosed()` would throw, map it with
+`Errors.exceptionFor(err)` from `io.telloai.errors`:
 
 ```java
 client.on(EventType.ERROR, e -> {
     ErrorEvent err = (ErrorEvent) e;
-    TelloException error = Errors.exceptionFor(err.code, err.message, err.question);
+    TelloException error = Errors.exceptionFor(err);
     if (error instanceof ValidationException) {
         // e.g. dtmfDigitsInvalid for a sendDtmf: fix the input; the call goes on
     }

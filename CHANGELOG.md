@@ -25,6 +25,20 @@
   `CrewGenerationTimeoutException` (`generateAndWait` ran out of time; carries the job
   id).
 
+### Added (WebSocket error codes)
+
+- `ipNotAllowed` (the connection's address is not on the server key's allowed IP
+  list) fails `connect()` with `AuthenticationException`, whose new `ip` field carries
+  the address the gateway proved (null when none).
+- `insufficientScope` maps to the new `PermissionDeniedException` with
+  `requiredScope`; only that command is refused and the connection stays open (a
+  `createCall` refused this way ends `waitClosed()` with it).
+- An `internalError` answering `auth`, or close 1011 before `auth.ok` (the gateway
+  could not check the key), now fails `connect()` with `TelloServerException`
+  (`code` `internalError`) instead of `ConnectionClosedException`.
+- `ErrorEvent` gains `requiredScope` and `ip`; `Errors.exceptionFor(ErrorEvent)` maps
+  an event with all of its fields.
+
 ### Changed (docs)
 
 - The gateway is now called the API gateway (api-gateway). The README and package

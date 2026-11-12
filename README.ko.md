@@ -116,6 +116,8 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.i
 | 게이트웨이 `code` | 예외 |
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (4401 종료 포함) |
+| `ipNotAllowed` | `AuthenticationException` (`.ip` 포함, 4401 종료 포함) |
+| `insufficientScope` | `PermissionDeniedException` (`.requiredScope` 포함. 그 명령만 거절되고 연결은 유지) |
 | `toRequired` | `ValidationException` |
 | `callIdRequired` | `ValidationException` |
 | `dtmfDigitsRequired` | `ValidationException` |
@@ -127,7 +129,10 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.i
 | `callRejected` | `CallRejectedException` (`.question` 포함) |
 | `internalError` | `TelloServerException` |
 
-표에 없는 코드는 `TelloServerException`으로 떨어집니다.
+표에 없는 코드는 `TelloServerException`으로 떨어집니다. `auth`에 대한 응답으로 온
+`internalError`(1011 종료: 게이트웨이가 키를 확인하지 못함)는 `connect()`를
+`AuthenticationException`이 아니라 `TelloServerException`으로 실패시킵니다. 키가
+거절된 것은 아니므로 잠시 뒤 다시 접속해도 됩니다.
 
 모든 오류는 게이트웨이 코드를 `.code`에 담고 있습니다. **분기는 `.code`로 하고
 `.getMessage()`로는 하지 마세요.** 메시지는 게이트웨이가 다시 쓸 수 있는 표시용
@@ -171,14 +176,14 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.i
 기다립니다. 통화 도중 연결이 끊기면 `ConnectionClosedException`, 다른 연결에
 세션을 빼앗기면(4429 종료) `SessionReplacedException`입니다.
 
-`ErrorEvent`에는 원래의 `code`, `message`, `question`이 담겨 있습니다.
-`waitClosed()`가 던지는 것과 같은 타입의 예외로 다루려면 `io.telloai.errors`의
-`Errors.exceptionFor(code, message, question)`으로 바꾸세요:
+`ErrorEvent`에는 원래의 `code`, `message`, `question`, `requiredScope`, `ip`가 담겨
+있습니다. `waitClosed()`가 던지는 것과 같은 타입의 예외로 다루려면
+`io.telloai.errors`의 `Errors.exceptionFor(err)`로 바꾸세요:
 
 ```java
 client.on(EventType.ERROR, e -> {
     ErrorEvent err = (ErrorEvent) e;
-    TelloException error = Errors.exceptionFor(err.code, err.message, err.question);
+    TelloException error = Errors.exceptionFor(err);
     if (error instanceof ValidationException) {
         // 예: sendDtmf의 dtmfDigitsInvalid. 입력을 고치면 되고 통화는 계속됩니다
     }

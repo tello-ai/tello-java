@@ -13,6 +13,7 @@ import com.google.gson.JsonParser;
 import io.telloai.errors.CallAlreadyActiveException;
 import io.telloai.errors.CallRefusedException;
 import io.telloai.errors.ConnectionClosedException;
+import io.telloai.errors.PermissionDeniedException;
 import io.telloai.errors.TelloServerException;
 import io.telloai.events.ErrorEvent;
 import io.telloai.events.TelloEvent;
@@ -107,6 +108,39 @@ class CallWaitTest {
         server.sendText(error("insufficientCredit", requestIdOf(createCall)));
 
         assertInstanceOf(CallRefusedException.class, waitFailure(wait));
+    }
+
+    @Test
+    void createCallWithoutScopeEndsTheWaitWithPermissionDenied() throws Exception {
+        client.createCall("+821012345678", "", null, "create-1").join();
+        JsonObject createCall = nextCommand("createCall");
+        CompletableFuture<Void> wait = startWait();
+
+        JsonObject frame = JsonParser.parseString(error("insufficientScope", requestIdOf(createCall)))
+                .getAsJsonObject();
+        frame.addProperty("requiredScope", "calls:write");
+        server.sendText(frame.toString());
+
+        PermissionDeniedException ex = assertInstanceOf(PermissionDeniedException.class, waitFailure(wait));
+        assertEquals("calls:write", ex.requiredScope);
+    }
+
+    @Test
+    void commandWithoutScopeKeepsTheConnection() throws Exception {
+        BlockingQueue<ErrorEvent> errors = new LinkedBlockingQueue<>();
+        client.on(EventType.ERROR, e -> errors.add((ErrorEvent) e));
+        client.getSummary("c1", "sum-1").join();
+        JsonObject frame = JsonParser.parseString(error("insufficientScope", requestIdOf(nextCommand("getSummary"))))
+                .getAsJsonObject();
+        frame.addProperty("requiredScope", "calls:read");
+        server.sendText(frame.toString());
+
+        ErrorEvent err = errors.poll(3, TimeUnit.SECONDS);
+        assertNotNull(err);
+        assertEquals("calls:read", err.requiredScope);
+        // The connection stays open: the next command still goes out.
+        client.getSummary("c1", "sum-2").join();
+        nextCommand("getSummary");
     }
 
     @Test
