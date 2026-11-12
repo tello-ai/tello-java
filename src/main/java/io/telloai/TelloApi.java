@@ -64,6 +64,7 @@ public final class TelloApi {
     private final Agents agents = new Agents(this);
     private final Crews crews = new Crews(this);
     private final CrewGenerations crewGenerations = new CrewGenerations(this);
+    private final CallDrafts callDrafts = new CallDrafts(this);
 
     /** A client with the key from {@code $TELLO_API_KEY} and the URL from {@code $TELLO_API_URL} or the default. */
     public TelloApi() {
@@ -127,6 +128,14 @@ public final class TelloApi {
     /** Crew generation jobs ({@code /crew-generations}) started by {@link Crews#generate(JsonObject)}. */
     public CrewGenerations crewGenerations() {
         return crewGenerations;
+    }
+
+    /**
+     * Call drafts ({@code /call-drafts}): describe a call in words, review the draft, and
+     * confirm it. <b>Confirming places a real, billed call.</b>
+     */
+    public CallDrafts callDrafts() {
+        return callDrafts;
     }
 
     Duration timeout() {
