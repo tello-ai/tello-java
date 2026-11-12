@@ -34,6 +34,7 @@ final class FakeApi implements AutoCloseable {
     private final HttpServer server;
     private final BlockingQueue<Request> requests = new LinkedBlockingQueue<>();
     private final ConcurrentLinkedDeque<Reply> replies = new ConcurrentLinkedDeque<>();
+    private volatile Reply fallback = new Reply(599, "", "text/plain", 0);
 
     FakeApi() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -66,6 +67,12 @@ final class FakeApi implements AutoCloseable {
         return this;
     }
 
+    /** The reply once the queued ones run out. */
+    FakeApi replyOtherwise(int status, String json) {
+        fallback = new Reply(status, json, "application/json", 0);
+        return this;
+    }
+
     /** The next request received, waiting up to 5 seconds. */
     Request take() throws InterruptedException {
         Request request = requests.poll(5, TimeUnit.SECONDS);
@@ -89,7 +96,7 @@ final class FakeApi implements AutoCloseable {
                 new String(in, StandardCharsets.UTF_8)));
         Reply reply = replies.poll();
         if (reply == null) {
-            reply = new Reply(599, "", "text/plain", 0);
+            reply = fallback;
         }
         if (reply.delayMillis() > 0) {
             try {

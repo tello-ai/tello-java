@@ -63,6 +63,7 @@ public final class TelloApi {
     private final Tools tools = new Tools(this);
     private final Agents agents = new Agents(this);
     private final Crews crews = new Crews(this);
+    private final CrewGenerations crewGenerations = new CrewGenerations(this);
 
     /** A client with the key from {@code $TELLO_API_KEY} and the URL from {@code $TELLO_API_URL} or the default. */
     public TelloApi() {
@@ -121,6 +122,11 @@ public final class TelloApi {
     /** Crews ({@code /crews}): list them, read, create, change or delete one, or generate one from a goal. */
     public Crews crews() {
         return crews;
+    }
+
+    /** Crew generation jobs ({@code /crew-generations}) started by {@link Crews#generate(JsonObject)}. */
+    public CrewGenerations crewGenerations() {
+        return crewGenerations;
     }
 
     Duration timeout() {
