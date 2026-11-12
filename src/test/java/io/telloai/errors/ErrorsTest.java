@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.google.gson.JsonParser;
+import io.telloai.events.ErrorEvent;
+import io.telloai.events.EventParser;
 import java.util.List;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -14,6 +17,8 @@ class ErrorsTest {
     /** Every code in docs/errors/errors.v1.json, in the order the contract lists them. */
     private static final List<Mapping> CONTRACT = List.of(
             new Mapping("unauthenticated", AuthenticationException.class),
+            new Mapping("ipNotAllowed", AuthenticationException.class),
+            new Mapping("insufficientScope", PermissionDeniedException.class),
             new Mapping("callAlreadyActive", CallAlreadyActiveException.class),
             new Mapping("toRequired", ValidationException.class),
             new Mapping("callIdRequired", ValidationException.class),
@@ -50,7 +55,7 @@ class ErrorsTest {
 
     @Test
     void coversEveryCodeTheContractDefines() {
-        assertEquals(19, CONTRACT.size());
+        assertEquals(21, CONTRACT.size());
     }
 
     @Test
@@ -76,5 +81,27 @@ class ErrorsTest {
         assertInstanceOf(CallRejectedException.class, ex);
         assertEquals("why?", ((CallRejectedException) ex).question);
         assertEquals("callRejected", ex.code);
+    }
+
+    @Test
+    void insufficientScopeCarriesTheRequiredScope() {
+        ErrorEvent err = (ErrorEvent) EventParser.parse(JsonParser.parseString(
+                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"insufficientScope\","
+                        + "\"message\":\"no scope\",\"requestId\":\"r1\",\"requiredScope\":\"calls:write\"}")
+                .getAsJsonObject());
+        PermissionDeniedException ex = assertInstanceOf(PermissionDeniedException.class, Errors.exceptionFor(err));
+        assertEquals("insufficientScope", ex.code);
+        assertEquals("calls:write", ex.requiredScope);
+    }
+
+    @Test
+    void ipNotAllowedCarriesTheIp() {
+        ErrorEvent err = (ErrorEvent) EventParser.parse(JsonParser.parseString(
+                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"ipNotAllowed\","
+                        + "\"message\":\"blocked\",\"ip\":\"203.0.113.7\"}")
+                .getAsJsonObject());
+        AuthenticationException ex = assertInstanceOf(AuthenticationException.class, Errors.exceptionFor(err));
+        assertEquals("ipNotAllowed", ex.code);
+        assertEquals("203.0.113.7", ex.ip);
     }
 }

@@ -36,6 +36,19 @@ class EventParserTest {
     }
 
     @Test
+    void parsesRequiredScopeAndIpOfErrors() {
+        ErrorEvent scope = assertInstanceOf(ErrorEvent.class, EventParser.parse(obj(
+                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"insufficientScope\",\"message\":\"m\","
+                        + "\"requiredScope\":\"calls:read\"}")));
+        assertEquals("calls:read", scope.requiredScope);
+        assertEquals(null, scope.ip);
+        ErrorEvent ip = assertInstanceOf(ErrorEvent.class, EventParser.parse(obj(
+                "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"ipNotAllowed\",\"message\":\"m\",\"ip\":null}")));
+        assertEquals(null, ip.ip);
+        assertEquals(null, ip.requiredScope);
+    }
+
+    @Test
     void parsesAnswerAcceptedWithRequestCorrelation() {
         TelloEvent e = EventParser.parse(obj(
                 "{\"type\":\"answer.accepted\",\"version\":\"1.0\",\"requestId\":\"answer-1\",\"sessionId\":\"s1\",\"callId\":\"c1\",\"messageId\":\"message-1\",\"timestamp\":\"t\"}"));

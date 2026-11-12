@@ -8,6 +8,7 @@ import io.telloai.errors.ConnectionClosedException;
 import io.telloai.errors.Errors;
 import io.telloai.errors.SessionReplacedException;
 import io.telloai.errors.TelloException;
+import io.telloai.errors.TelloServerException;
 import io.telloai.events.ErrorEvent;
 import io.telloai.events.Event;
 import io.telloai.events.EventParser;
@@ -37,7 +38,7 @@ import java.util.function.Function;
 /**
  * Tello WebSocket realtime client.
  *
- * <p>Opens a single WS connection to the turn-provider-gateway {@code /sdk} endpoint,
+ * <p>Opens a single WS connection to the API gateway (api-gateway) {@code /sdk} endpoint,
  * sends command frames ({@code createCall} / {@code answer} / {@code cancel}) and
  * dispatches inbound turn/status/terminal/error events to pub/sub handlers.
  *
@@ -83,6 +84,7 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
     private static final System.Logger LOG = System.getLogger("tello");
     private static final int CLOSE_UNAUTHENTICATED = 4401;
     private static final int CLOSE_SESSION_REPLACED = 4429;
+    private static final int CLOSE_INTERNAL_ERROR = 1011;
     private static final long CLOSE_WAIT_MILLIS = 5_000L;
 
     /** This SDK's package version, read from the resource the build fills in. */
@@ -548,9 +550,12 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         // A call ends before the event that ends it reaches a handler, so a handler
         // that starts a follow-up call opens a new one.
         if (event instanceof ErrorEvent err) {
-            TelloException exc = Errors.exceptionFor(err.code, err.message, err.question);
+            TelloException exc = Errors.exceptionFor(err);
             synchronized (lock) {
-                if ("unauthenticated".equals(err.code)) {
+                if ("unauthenticated".equals(err.code) || "ipNotAllowed".equals(err.code)
+                        || ("internalError".equals(err.code) && !authFuture.isDone())) {
+                    // Answers auth: unauthenticated / ipNotAllowed come with close 4401,
+                    // internalError (the key could not be checked) with close 1011.
                     closeExc = exc;
                     failAuth(exc);
                 } else if (endsCall(err)) {
@@ -630,6 +635,11 @@ public class TelloClient extends EventEmitter implements AutoCloseable {
         } else if (code == CLOSE_SESSION_REPLACED) {
             if (closeExc == null) {
                 closeExc = new SessionReplacedException(isBlank(reason) ? "session replaced" : reason);
+            }
+        } else if (code == CLOSE_INTERNAL_ERROR && !authFuture.isDone()) {
+            // The gateway could not check the key: not a refusal, reconnecting later may work.
+            if (closeExc == null) {
+                closeExc = new TelloServerException(isBlank(reason) ? "internal error" : reason, "internalError");
             }
         }
     }

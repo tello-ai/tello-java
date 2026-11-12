@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+### Added (REST resource API)
+
+- `io.telloai.TelloApi`, a REST client for the public API (`https://api.telloai.io/v1`),
+  separate from the realtime `TelloClient`. Resources: `tools()` (list with
+  `limit`/`cursor`, get, create, update, delete), `agents()` and `crews()` (list, get,
+  create, update, delete), `crews().generate` / `generateAndWait` with
+  `crewGenerations().get`, and `callDrafts()` (create, revise, confirm). Every method
+  returns a `CompletableFuture`; bodies and results are Gson `JsonObject`s, so unknown
+  fields are kept. Uses the built-in `java.net.http.HttpClient`; no new dependency.
+- Key from the argument or `TELLO_API_KEY`; URL from the argument, `TELLO_API_URL`, or
+  `https://api.telloai.io/v1` (https only; plain http for loopback hosts). Requests send
+  `User-Agent: tello-java-sdk/<version>`. Timeouts are 30 s for reads (get, list) and
+  120 s for every write (tool, agent and crew create/update/delete, crew generation,
+  call draft create/revise/confirm); both can be changed on
+  `TelloApi.builder()`. Nothing is retried automatically.
+- `Idempotency-Key` is sent only when given, except `callDrafts().confirm`, which
+  generates a UUID when none is given and reports it on failure.
+- Errors: `TelloApiException` (`status`, snake_case `code` as the server sent it,
+  `data`, `idempotencyKey`; `http_<status>` for non-envelope responses,
+  `invalid_response` for undocumented success statuses or non-object bodies),
+  `TelloApiConnectionException` (no response; the cause is kept) and
+  `CrewGenerationTimeoutException` (`generateAndWait` ran out of time; carries the job
+  id).
+
+### Added (WebSocket error codes)
+
+- `ipNotAllowed` (the connection's address is not on the server key's allowed IP
+  list) fails `connect()` with `AuthenticationException`, whose new `ip` field carries
+  the address the gateway proved (null when none).
+- `insufficientScope` maps to the new `PermissionDeniedException` with
+  `requiredScope`; only that command is refused and the connection stays open (a
+  `createCall` refused this way ends `waitClosed()` with it).
+- An `internalError` answering `auth`, or close 1011 before `auth.ok` (the gateway
+  could not check the key), now fails `connect()` with `TelloServerException`
+  (`code` `internalError`) instead of `ConnectionClosedException`.
+- `ErrorEvent` gains `requiredScope` and `ip`; `Errors.exceptionFor(ErrorEvent)` maps
+  an event with all of its fields.
+
+### Changed (docs)
+
+- The gateway is now called the API gateway (api-gateway). The README and package
+  description use the new name, and `docs/protocol`, `docs/events` and `docs/errors`
+  are synced from the gateway's canonical copies.
+
 ## 0.1.3 (2026-10-01)
 
 ### Fixed (release)

@@ -2,15 +2,17 @@
 
 # tello-java
 
-Tello SDK for Java — a thin **WebSocket** realtime client for the
-turn-provider-gateway `/sdk` endpoint. The SDK is the "conversation brain": the
-gateway streams each caller turn from a live phone call, and your handler's reply
-is forwarded back into the call.
+Tello SDK for Java — a thin **WebSocket** realtime client for the API gateway
+(api-gateway) `/sdk` endpoint, plus a **REST** client for the public resource API
+(tools, agents, crews, crew generation, call drafts). On the WebSocket side the SDK
+is the "conversation brain": the gateway streams each caller turn from a live phone
+call, and your handler's reply is forwarded back into the call.
 
 > repo: `tello-java` · Maven artifact: `io.telloai:tello-sdk` · package: `io.telloai`
 >
-> Transport is WebSocket only. There is no REST or webhook surface. The protocol
-> contract lives in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md).
+> The realtime client (`TelloClient`) is WebSocket only; its protocol contract lives
+> in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md). The REST resource
+> API is a separate client, `TelloApi` (§6). There is no webhook surface.
 > Ported from `tello-python`; behaviour is 1:1 with the gateway.
 
 ## 1. Install
@@ -34,7 +36,8 @@ Maven:
 ```
 
 Requires Java 17+. The only runtime dependency is Gson; the WebSocket transport is
-the built-in `java.net.http.WebSocket`.
+the built-in `java.net.http.WebSocket` and the REST client uses the built-in
+`java.net.http.HttpClient`.
 
 ## 2. API key
 
@@ -118,6 +121,8 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | gateway `code` | exception |
 | --- | --- |
 | `unauthenticated` | `AuthenticationException` (also close code 4401) |
+| `ipNotAllowed` | `AuthenticationException` (with `.ip`; also close code 4401) |
+| `insufficientScope` | `PermissionDeniedException` (with `.requiredScope`; only that command is refused, the connection stays open) |
 | `toRequired` | `ValidationException` |
 | `callIdRequired` | `ValidationException` |
 | `dtmfDigitsRequired` | `ValidationException` |
@@ -129,7 +134,10 @@ Gateway error frames map 1:1 to exceptions (all extend `TelloException`, uncheck
 | `callRejected` | `CallRejectedException` (with `.question`) |
 | `internalError` | `TelloServerException` |
 
-An unrecognised code falls back to `TelloServerException`.
+An unrecognised code falls back to `TelloServerException`. An `internalError`
+answering `auth` (close 1011: the gateway could not check the key) fails `connect()`
+with a `TelloServerException` rather than an `AuthenticationException`; the key was
+not refused, so reconnecting later may work.
 
 Every error carries the gateway code on `.code` — branch on that, never on
 `.getMessage()`, which is display text the gateway may reword.
@@ -172,14 +180,14 @@ is delivered only as an `EventType.ERROR` event; the call keeps running and
 `ConnectionClosedException`; session displaced (close 4429) →
 `SessionReplacedException`.
 
-An `ErrorEvent` carries the raw `code`, `message`, and `question`. To handle it as
-the typed exception `waitClosed()` would throw, map it with
-`Errors.exceptionFor(code, message, question)` from `io.telloai.errors`:
+An `ErrorEvent` carries the raw `code`, `message`, `question`, `requiredScope` and
+`ip`. To handle it as the typed exception `waitClosed()` would throw, map it with
+`Errors.exceptionFor(err)` from `io.telloai.errors`:
 
 ```java
 client.on(EventType.ERROR, e -> {
     ErrorEvent err = (ErrorEvent) e;
-    TelloException error = Errors.exceptionFor(err.code, err.message, err.question);
+    TelloException error = Errors.exceptionFor(err);
     if (error instanceof ValidationException) {
         // e.g. dtmfDigitsInvalid for a sendDtmf: fix the input; the call goes on
     }
@@ -190,7 +198,117 @@ The gateway drives a WS-level ping heartbeat; pongs are sent automatically. Ther
 is no reconnect/resume — treat an abnormal close as reconnect-worthy and restart
 the call.
 
-## 6. Examples
+## 6. REST resource API
+
+`TelloApi` manages the account's resources over the public REST API
+(`https://api.telloai.io/v1`). It is separate from `TelloClient` and needs no
+WebSocket connection.
+
+> **Writes go live at once.** Creating, changing or deleting a tool, agent or crew
+> is deployed to live calls immediately. **`callDrafts().confirm(...)` places a real,
+> billed phone call.**
+
+```java
+TelloApi api = new TelloApi();          // $TELLO_API_KEY, $TELLO_API_URL
+JsonObject agents = api.agents().list().join();
+
+JsonObject tool = new JsonObject();
+tool.addProperty("type", "endCall");
+tool.addProperty("name", "통화 종료");
+tool.addProperty("functionName", "end_call");
+JsonObject created = api.tools().create(tool, "create-end-call-1").join();
+```
+
+- **Key and URL**: `new TelloApi(apiKey)` / `new TelloApi(apiKey, apiUrl)`, or the
+  `TELLO_API_KEY` / `TELLO_API_URL` environment variables (the arguments win). Without
+  either URL the client uses `https://api.telloai.io/v1`. The URL must be `https`;
+  plain `http` is accepted only for `localhost`, `127.0.0.1` and `::1`. The key is
+  sent as `Authorization: Bearer <key>` and never appears in `toString()` or error
+  messages. Every request carries `User-Agent: tello-java-sdk/<version>`.
+- **Timeouts**: 30 seconds for reads (get, list); 120 seconds for every write (tool,
+  agent and crew create/update/delete, crew generation, call draft
+  create/revise/confirm). Change them with
+  `TelloApi.builder().apiKey(k).timeout(d).longTimeout(d).build()`.
+- **No automatic retries.** To retry a create safely, pass an idempotency key and
+  reuse it.
+- **Bodies and results** are Gson `JsonObject`s shaped as in the public REST docs;
+  fields this SDK does not know are kept. Every method returns a
+  `CompletableFuture`. An empty id or an invalid idempotency key (1–255 printable
+  ASCII characters, no comma) throws `IllegalArgumentException` before any request.
+
+| method | HTTP | result |
+| --- | --- | --- |
+| `tools().list()` / `list(limit, cursor)` | `GET /tools` | `{data, nextCursor}` |
+| `tools().get(id)` | `GET /tools/{id}` | tool |
+| `tools().create(body[, idempotencyKey])` | `POST /tools` (201) | tool |
+| `tools().update(id, patch)` | `PATCH /tools/{id}` | tool |
+| `tools().delete(id)` | `DELETE /tools/{id}` (204) | `null` |
+| `agents().list()` | `GET /agents` | `{data}` |
+| `agents().get/create/update/delete` | `/agents[/{id}]` | agent / `null` |
+| `crews().list()` | `GET /crews` | `{data}` |
+| `crews().get/create/update/delete` | `/crews[/{id}]` | crew / `null` |
+| `crews().generate(input[, idempotencyKey])` | `POST /crews/generate` (202, or 200 for the existing job) | job |
+| `crews().generateAndWait(input[, pollInterval, timeout, idempotencyKey])` | generate, then poll | finished job |
+| `crewGenerations().get(id)` | `GET /crew-generations/{id}` | job |
+| `callDrafts().create(body[, idempotencyKey])` | `POST /call-drafts` (201) | draft |
+| `callDrafts().revise(draftId, request[, idempotencyKey])` | `POST /call-drafts/{id}/revise` | new draft (new id) |
+| `callDrafts().confirm(draftId[, idempotencyKey])` | `POST /call-drafts/{id}/confirm` (201) | call |
+
+`generateAndWait` polls every 2 seconds for up to 600 seconds by default and
+completes with the job once it is no longer `running`. A `failed` job is returned,
+not thrown: branch on `status`. If the time runs out it fails with
+`CrewGenerationTimeoutException` (a `TimeoutException`; `.generationId` names the job,
+which keeps running). Every draft status (`pendingConfirmation`,
+`needsClarification`, `refused`, `confirmed`) is a successful result.
+
+`confirm` always sends an `Idempotency-Key` (the API requires one): yours, or a
+generated UUID. A failed confirm carries that key; retry only with it so a lost
+response never becomes a second call.
+
+### REST errors
+
+A failed request completes the future exceptionally (`join()` wraps the error in a
+`CompletionException`):
+
+- `TelloApiException` — the server answered with an error. `.status` is the HTTP
+  status, `.code` the server's `error` exactly as sent (snake_case, as in the public
+  error table), `.getMessage()` its message, `.data` its `data` object or `null`,
+  `.idempotencyKey` the key the request carried or `null`. A response that is not
+  the API's error envelope (e.g. a proxy page) has `code` `http_<status>`; an
+  undocumented success status or a success body that is not a JSON object has
+  `code` `invalid_response`.
+- `TelloApiConnectionException` — no response (connection failure or timeout;
+  `getCause()` is the transport error). **A write may already have been applied**:
+  check with get or list before retrying, and retry with the same idempotency key.
+
+Both extend `TelloException`. Branch on `code`:
+
+| status | `code` | meaning |
+| --- | --- | --- |
+| 401 | `unauthenticated` | the key is missing, wrong or revoked |
+| 403 | `insufficient_scope` | the key lacks the scope this request needs |
+| 404 | `tool_not_found` / `agent_not_found` / `crew_not_found` | no such resource in the account |
+| 409 | `tool_in_use` / `agent_in_use` / `crew_in_use` | still referenced; see `data` |
+| 409 | `crew_generation_in_progress` | another crew is being generated; `data.id` is that job |
+| 404 | `draft_not_found` | no such call draft |
+| 409 | `idempotency_key_reused` | the key was used with a different request |
+| 502 | `write_outcome_unknown` | the write may or may not have been applied |
+
+The full list is in the public REST error docs.
+
+```java
+try {
+    api.tools().get("tool_123").join();
+} catch (CompletionException e) {
+    if (e.getCause() instanceof TelloApiException err && err.code.equals("tool_not_found")) {
+        // create it, or report the missing tool
+    } else {
+        throw e;
+    }
+}
+```
+
+## 7. Examples
 
 Standalone programs live in [`examples/`](examples/README.md): `BasicCall`
 (connect, one call, answer each turn) and `CallSummary` (gated live scenario
@@ -199,7 +317,7 @@ with `javac` against the built SDK classes.
 
 They place real calls. Read [`examples/README.md`](examples/README.md) first.
 
-## 7. Version compatibility
+## 8. Version compatibility
 
 `io.telloai:tello-sdk 0.1.x` implements Tello WS protocol `1.0`.
 

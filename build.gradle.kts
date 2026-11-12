@@ -57,8 +57,9 @@ mavenPublishing {
     pom {
         name.set("Tello SDK for Java")
         description.set(
-            "A thin WebSocket realtime client for the Tello turn-provider-gateway: place phone " +
-                "calls and answer each caller turn from your own code."
+            "A thin WebSocket realtime client for the Tello API gateway (api-gateway): place phone " +
+                "calls and answer each caller turn from your own code, plus a REST client for " +
+                "tools, agents, crews and call drafts."
         )
         url.set("https://github.com/tello-ai/tello-java")
         licenses {

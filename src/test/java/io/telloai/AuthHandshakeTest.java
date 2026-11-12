@@ -11,6 +11,7 @@ import com.google.gson.JsonParser;
 import io.telloai.errors.AuthenticationException;
 import io.telloai.errors.ConnectionClosedException;
 import io.telloai.errors.TelloException;
+import io.telloai.errors.TelloServerException;
 import java.net.ServerSocket;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -104,6 +105,46 @@ class AuthHandshakeTest {
             TelloException ex = assertThrows(AuthenticationException.class,
                     () -> new TelloClient(API_KEY, server.url()).connectBlocking());
             assertKeyAbsent(ex);
+        }
+    }
+
+    @Test
+    void ipNotAllowedFailsConnectWithTheIp() throws Exception {
+        try (FakeGateway server = FakeGateway.start()) {
+            server.onText(msg -> {
+                sendQuietly(server, "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"ipNotAllowed\","
+                        + "\"message\":\"The request IP address is not allowed\",\"ip\":\"203.0.113.7\"}");
+                closeQuietly(server, 4401, "ip_not_allowed");
+            });
+            AuthenticationException ex = assertThrows(AuthenticationException.class,
+                    () -> new TelloClient(API_KEY, server.url()).connectBlocking());
+            assertEquals("ipNotAllowed", ex.code);
+            assertEquals("203.0.113.7", ex.ip);
+            assertKeyAbsent(ex);
+        }
+    }
+
+    @Test
+    void internalErrorAnsweringAuthFailsConnectWithServerException() throws Exception {
+        try (FakeGateway server = FakeGateway.start()) {
+            server.onText(msg -> {
+                sendQuietly(server, "{\"type\":\"error\",\"version\":\"1.0\",\"code\":\"internalError\","
+                        + "\"message\":\"Internal error\"}");
+                closeQuietly(server, 1011, "internal_error");
+            });
+            TelloServerException ex = assertThrows(TelloServerException.class,
+                    () -> new TelloClient(API_KEY, server.url()).connectBlocking());
+            assertEquals("internalError", ex.code);
+        }
+    }
+
+    @Test
+    void close1011BeforeAuthOkFailsConnectWithServerException() throws Exception {
+        try (FakeGateway server = FakeGateway.start()) {
+            server.onText(msg -> closeQuietly(server, 1011, "internal_error"));
+            TelloServerException ex = assertThrows(TelloServerException.class,
+                    () -> new TelloClient(API_KEY, server.url()).connectBlocking());
+            assertEquals("internalError", ex.code);
         }
     }
 

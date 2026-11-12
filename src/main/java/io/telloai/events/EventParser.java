@@ -26,6 +26,8 @@ public final class EventParser {
                     str(frame, "message", ""),
                     strOrNull(frame, "requestId"),
                     strOrNull(frame, "question"),
+                    strOrNull(frame, "requiredScope"),
+                    strOrNull(frame, "ip"),
                     frame);
         }
 
