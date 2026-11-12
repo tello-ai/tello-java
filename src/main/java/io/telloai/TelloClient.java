@@ -38,7 +38,7 @@ import java.util.function.Function;
 /**
  * Tello WebSocket realtime client.
  *
- * <p>Opens a single WS connection to the turn-provider-gateway {@code /sdk} endpoint,
+ * <p>Opens a single WS connection to the API gateway (api-gateway) {@code /sdk} endpoint,
  * sends command frames ({@code createCall} / {@code answer} / {@code cancel}) and
  * dispatches inbound turn/status/terminal/error events to pub/sub handlers.
  *

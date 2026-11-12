@@ -1,5 +1,5 @@
 // Illustrative example (not part of the Gradle build).
-// Run against a locally-running turn-provider-gateway.
+// Run against a locally-running API gateway (api-gateway).
 
 import io.telloai.EventType;
 import io.telloai.TelloClient;
