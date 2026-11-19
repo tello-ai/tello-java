@@ -12,7 +12,10 @@ call, and your handler's reply is forwarded back into the call.
 >
 > The realtime client (`TelloClient`) is WebSocket only; its protocol contract lives
 > in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md). The REST resource
-> API is a separate client, `TelloApi` (§6). There is no webhook surface.
+> API is a separate client, `TelloApi` (§6). The SDK has no webhook surface: call
+> event webhooks (`call.ringing`, `call.started`, `call.transfer_started`,
+> `call.ended`) are set per agent or crew in the Tello portal and posted by Tello to
+> your own HTTPS endpoint.
 > Ported from `tello-python`; behaviour is 1:1 with the gateway.
 
 ## 1. Install
@@ -21,7 +24,7 @@ Gradle:
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.3")
+    implementation("io.telloai:tello-sdk:0.2.0")
 }
 ```
 
@@ -31,7 +34,7 @@ Maven:
 <dependency>
     <groupId>io.telloai</groupId>
     <artifactId>tello-sdk</artifactId>
-    <version>0.1.3</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -52,7 +55,7 @@ connects to `wss://api.telloai.io/sdk`.
 
 The upgrade URL also carries `sdk=java`, `version=<this package's version>` and
 `protocol=<PROTOCOL_VERSION>` (for example
-`wss://api.telloai.io/sdk?sdk=java&version=0.1.3&protocol=1.0`) so the gateway can log
+`wss://api.telloai.io/sdk?sdk=java&version=0.2.0&protocol=1.0`) so the gateway can log
 which client connected. Your URL's path and other query parameters are kept; those
 three keys replace any it already has. The server never rejects a connection over them.
 
@@ -100,7 +103,7 @@ cast to the concrete type:
 | `CALL_COMPLETED` | `call.completed` | `TerminalEvent` (`status`) |
 | `CALL_NO_ANSWER` | `call.noAnswer` | `TerminalEvent` (`status`, `failureReason`) |
 | `CALL_FAILED` | `call.failed` | `TerminalEvent` (`status`, `failureReason`) |
-| `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`) |
+| `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`, `requiredScope`, `ip`) |
 | `DISCONNECTED` | `disconnected` | `Event` (SDK-local; emitted when the WS closes) |
 
 `AUTH_OK` is consumed internally by `connect()` and never re-emitted.
@@ -285,8 +288,9 @@ Both extend `TelloException`. Branch on `code`:
 
 | status | `code` | meaning |
 | --- | --- | --- |
-| 401 | `unauthenticated` | the key is missing, wrong or revoked |
-| 403 | `insufficient_scope` | the key lacks the scope this request needs |
+| 401 | `unauthenticated` | the key is missing, wrong, revoked or expired |
+| 403 | `ip_not_allowed` | the request's address is not on the key's allowed IP list; `data.ip` is the address the API saw |
+| 403 | `insufficient_scope` | the key lacks the scope this request needs; `data.requiredScope` names it |
 | 404 | `tool_not_found` / `agent_not_found` / `crew_not_found` | no such resource in the account |
 | 409 | `tool_in_use` / `agent_in_use` / `crew_in_use` | still referenced; see `data` |
 | 409 | `crew_generation_in_progress` | another crew is being generated; `data.id` is that job |
@@ -319,7 +323,7 @@ They place real calls. Read [`examples/README.md`](examples/README.md) first.
 
 ## 8. Version compatibility
 
-`io.telloai:tello-sdk 0.1.x` implements Tello WS protocol `1.0`.
+`io.telloai:tello-sdk 0.1.x` and `0.2.x` implement Tello WS protocol `1.0`.
 
 The full frame contract is in [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md),
 with [`docs/events/sdk-events.v1.schema.json`](docs/events/sdk-events.v1.schema.json)

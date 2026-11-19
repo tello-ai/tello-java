@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-19)
 
 ### Added (REST resource API)
 
@@ -45,6 +45,11 @@
 - The gateway is now called the API gateway (api-gateway). The README and package
   description use the new name, and `docs/protocol`, `docs/events` and `docs/errors`
   are synced from the gateway's canonical copies.
+- The README lists `ErrorEvent`'s `requiredScope` and `ip`, adds the REST
+  `ip_not_allowed` (403, `data.ip`) error and `data.requiredScope` on
+  `insufficient_scope`, and states that call event webhooks (`call.ringing`,
+  `call.started`, `call.transfer_started`, `call.ended`) are set per agent or crew in
+  the Tello portal, not through this SDK.
 
 ## 0.1.3 (2026-10-01)
 

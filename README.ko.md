@@ -12,7 +12,10 @@ SDK가 대화의 두뇌를 맡습니다. 게이트웨이는 진행 중인 통화
 >
 > 실시간 클라이언트(`TelloClient`)는 WebSocket만 씁니다. 프로토콜 계약은
 > [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에 있습니다. REST 자원
-> API는 별도 클라이언트 `TelloApi`입니다(§6). webhook은 제공하지 않습니다.
+> API는 별도 클라이언트 `TelloApi`입니다(§6). SDK에는 webhook 기능이 없습니다. 통화
+> 이벤트 webhook(`call.ringing`, `call.started`, `call.transfer_started`,
+> `call.ended`)은 Tello 포털에서 에이전트·크루마다 정하고, Tello가 여러분의 HTTPS
+> 주소로 보냅니다.
 > `tello-python`에서 이식했고, 게이트웨이 기준 동작이 1:1로 같습니다.
 
 ## 1. 설치
@@ -21,7 +24,7 @@ Gradle:
 
 ```kotlin
 dependencies {
-    implementation("io.telloai:tello-sdk:0.1.3")
+    implementation("io.telloai:tello-sdk:0.2.0")
 }
 ```
 
@@ -31,7 +34,7 @@ Maven:
 <dependency>
     <groupId>io.telloai</groupId>
     <artifactId>tello-sdk</artifactId>
-    <version>0.1.3</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -94,7 +97,7 @@ try (TelloClient client = new TelloClient("tello_live_xxx", "wss://api.telloai.i
 | `CALL_COMPLETED` | `call.completed` | `TerminalEvent` (`status`) |
 | `CALL_NO_ANSWER` | `call.noAnswer` | `TerminalEvent` (`status`, `failureReason`) |
 | `CALL_FAILED` | `call.failed` | `TerminalEvent` (`status`, `failureReason`) |
-| `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`) |
+| `ERROR` | `error` | `ErrorEvent` (`code`, `message`, `requestId`, `question`, `requiredScope`, `ip`) |
 | `DISCONNECTED` | `disconnected` | `Event` (SDK 자체 이벤트. WS가 닫힐 때 발생) |
 
 `AUTH_OK`는 `connect()`가 내부에서 소비하며 밖으로 다시 emit 하지 않습니다.
@@ -278,8 +281,9 @@ UUID를 만들어 보내고, 실패한 오류에 그 키를 싣습니다. 다시
 
 | 상태 | `code` | 뜻 |
 | --- | --- | --- |
-| 401 | `unauthenticated` | 키가 없거나 틀렸거나 폐기됐습니다 |
-| 403 | `insufficient_scope` | 이 요청에 필요한 권한이 키에 없습니다 |
+| 401 | `unauthenticated` | 키가 없거나 틀렸거나 폐기·만료됐습니다 |
+| 403 | `ip_not_allowed` | 요청 주소가 키의 허용 IP 목록에 없습니다. `data.ip`가 API가 본 주소입니다 |
+| 403 | `insufficient_scope` | 이 요청에 필요한 권한이 키에 없습니다. `data.requiredScope`가 그 권한입니다 |
 | 404 | `tool_not_found` / `agent_not_found` / `crew_not_found` | 계정에 그 자원이 없습니다 |
 | 409 | `tool_in_use` / `agent_in_use` / `crew_in_use` | 아직 다른 곳에서 쓰고 있습니다. `data`를 보세요 |
 | 409 | `crew_generation_in_progress` | 다른 크루를 만드는 중입니다. `data.id`가 그 작업입니다 |
@@ -314,7 +318,7 @@ try {
 
 ## 8. 버전 호환성
 
-`io.telloai:tello-sdk 0.1.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
+`io.telloai:tello-sdk 0.1.x`와 `0.2.x`는 Tello WS 프로토콜 `1.0`을 구현합니다.
 
 프레임 계약 전문은 [`docs/protocol/sdk-ws.v1.md`](docs/protocol/sdk-ws.v1.md)에
 있고, [`docs/events/sdk-events.v1.schema.json`](docs/events/sdk-events.v1.schema.json)과
