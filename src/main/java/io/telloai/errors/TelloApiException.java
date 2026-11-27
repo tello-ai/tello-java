@@ -17,7 +17,7 @@ public class TelloApiException extends TelloException {
     /** The HTTP status of the response. */
     public final int status;
 
-    /** The envelope's {@code data} (e.g. {@code missingVariables}), or null. */
+    /** The envelope's {@code data} (e.g. {@code reason} or {@code detail}), or null. */
     public final JsonObject data;
 
     /**

@@ -131,15 +131,15 @@ class TelloApiTransportTest {
 
     @Test
     void mapsTheErrorEnvelopeToTelloApiException() {
-        fake.reply(400, "{\"statusCode\":400,\"message\":\"Missing variables\","
-                + "\"error\":\"missing_variables\",\"data\":{\"missingVariables\":[\"name\"]}}");
+        fake.reply(422, "{\"statusCode\":422,\"message\":\"This field is not supported for a crew target\","
+                + "\"error\":\"unsupported_for_crew\",\"data\":{\"fields\":[\"crewId\"]}}");
         Throwable e = failure(api.request("POST", "/call-drafts", null, new JsonObject(), "k-9", api.timeout(), 201));
         TelloApiException err = assertInstanceOf(TelloApiException.class, e);
         assertInstanceOf(TelloException.class, err);
-        assertEquals(400, err.status);
-        assertEquals("missing_variables", err.code);
-        assertEquals("Missing variables", err.getMessage());
-        assertEquals(json("{\"missingVariables\":[\"name\"]}"), err.data);
+        assertEquals(422, err.status);
+        assertEquals("unsupported_for_crew", err.code);
+        assertEquals("This field is not supported for a crew target", err.getMessage());
+        assertEquals(json("{\"fields\":[\"crewId\"]}"), err.data);
         assertEquals("k-9", err.idempotencyKey);
     }
 
